@@ -8,8 +8,8 @@ namespace
 	// HLSL shader result is returned as a structure from the main function.
 	// These is the name of the strcture and the name of the vartiable that WILL
 	// be declared in the main function.
-	const std::string HLSL_ShaderResultStruct = "SGE_SHADER_RESULT";
-	const std::string HLSL_ShaderResultVar = "sge_shader_result";
+	const std::string HLSL_ShaderResultStruct = "XSR_SHADER_RESULT";
+	const std::string HLSL_ShaderResultVar = "XSR_shader_result";
 }
 
 //-----------------------------------------------------------------------
