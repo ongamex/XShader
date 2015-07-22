@@ -1,13 +1,6 @@
 # XShader(XSR)
 #[CAUTION] : This is a "pre-beta" project that is still in development.
 
-XShader is (going to be) custom language designed to be compiled to HLSL, GLSL(and eventually other shading languages).
-
-The language parser is implemented using FLEX/BISON.
-
-The main goal(that isn't reached yet) of the project is to provide something that is reasonably modifiable by other 
-programmers rather than a compleate solution to the problem (although I'm thinking of trying).
-
 Example minamal vertex shader: 
 
 [XSR]
