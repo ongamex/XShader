@@ -18,8 +18,9 @@ void main() {
 
 Looks in:
 
-[HLSL]
 ```C++
+//-----------------------------------------------------
+// [HLSL]
 uniform float4x4 projView;
 uniform float4x4 world;
 struct XSR_SHADER_RESULT  {
@@ -34,10 +35,9 @@ XSR_SHADER_RESULT main(float3 a_pos : a_position) {
   return XSR_shader_result;
 
 }
-```
 
-[GLSL]
-```C++
+//-----------------------------------------------------
+// [GLSL]
 attribute vec3 a_position;
 uniform mat4 projView;
 uniform mat4 world;
