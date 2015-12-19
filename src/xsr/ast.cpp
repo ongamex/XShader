@@ -6,7 +6,7 @@
 namespace
 {
 	// HLSL shader result is returned as a structure from the main function.
-	// These is the name of the strcture and the name of the vartiable that WILL
+	// These are the names of the strctures and variables that WILL
 	// be declared in the main function.
 	const std::string HLSL_ShaderResultStruct = "XSR_SHADER_RESULT";
 	const std::string HLSL_ShaderResultVar = "XSR_shader_result";
@@ -167,8 +167,8 @@ const Ast::FullVariableDesc* Ast::findVarInCurrentScope(const std::string& name)
 		{
 			if(v.fullName == fullName) {
 
-				// Check if this is a "keyword variable"/
-				// Mark the variable as "mantioned" meaning that this variable need a special declaration in the output code(usually(maybe only) stage specific variable).
+				// Check if this is a "keyword variable".
+				// Mark the variable as "mantioned", meaning that this variable needs a special declaration in the output code(usually(maybe only) stage specific variables).
 				
 				const bool isKeywordVar = v.trait == VarTrait_StageSpecificInput || v.trait == VarTrait_StageSpecificOutput;
 			
@@ -307,8 +307,8 @@ std::string ExprBin::Internal_GenerateCode(Ast* ast)
 		case EBT_Sub : return left->GenerateCode(ast) + (" - ") + right->GenerateCode(ast);
 		case EBT_Mul :
 		{
-			// in HLSL matrix multiplication is a bit odd. mathematical multiplication with matrices is
-			// done with mul(m,?) while component whise matrix multiplication is done with *.
+			// In HLSL matrix multiplication is a bit odd. mathematical multiplication with matrices is
+			// done with mul(m,?) while component-wise matrix multiplication is done with *.
 			const Type lt = left->DeduceType(ast).GetBuiltInType();
 			const Type rt = right->DeduceType(ast).GetBuiltInType();
 
@@ -336,11 +336,10 @@ std::string ExprBin::Internal_GenerateCode(Ast* ast)
 		case EBT_Equals :   return left->GenerateCode(ast) + (" == ") + right->GenerateCode(ast);
 		case EBT_NEquals :  return left->GenerateCode(ast) + (" != ") + right->GenerateCode(ast);
 		case EBT_Or :       return left->GenerateCode(ast) + (" || ") + right->GenerateCode(ast);
-		case EBT_And :      return left->GenerateCode(ast) + (" && ") + right->GenerateCode(ast);
-		default :           return left->GenerateCode(ast) + (" <unknown-bin-op> ") + right->GenerateCode(ast);
+		case EBT_And :      return left->GenerateCode(ast) + (" && ") + right->GenerateCode(ast);         
 	}
 
-	return "expr ??? expr";
+	throw ParseExcept("Unknown bynary opt!");
 }
 
 void ExprBin::Internal_Declare(Ast* ast)
@@ -1032,12 +1031,12 @@ namespace XSR
 
 			}
 
-			// Declare the vertex attributes, io varyings, and uniforms
+			// Declare the vertex attributes, io varyings, and uniforms.
 			{
 				// Declare all the keyword variables...
 				// The languages uses the glsl-style of returning/obtaining stage specific variables.
-				// There variables are always implicitly defined, of course we aren't always define them in the output language.
-				// There is a "mentioned" list sotred in the Ast that holds a list of mentioned variables.
+				// These variables are always implicitly defined(some of there are defined only if they are used).
+				// There is a "mentioned" list stored in the Ast that holds a list of mentioned variables.
 				{
 					// Vertex shader outputs
 					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_VertexOut", TypeDesc(Type_vec4f), VarTrait_StageSpecificOutput, "SV_Position", "gl_Position"));
@@ -1049,26 +1048,26 @@ namespace XSR
 				};
 
 				// Vertex Attributes.
-				// [TODO] Reconcider to declare these values as local variable in main.
+				// [TODO] Concider to declare these values as locals in main.
 				for(const auto& var : ast.vertexAttribs) {
 					ast.declareVariable(var.type, var.varName, VarTrait_VertexAttribute);
 				}
 
 				// Input varyings. 
-				// [TODO] Reconcider to declare these values as local variable in main.
+				// [TODO] Concider to declare these values as locals in main.
 				for(const auto& var : ast.stageInputVaryings)
 				{
 					ast.declareVariable(var.type, var.varName, VarTrait_StageInVarying);
 				}
 
 				// Output varyings.
-				// [TODO] Reconcider to declare these values as local variable in main.
+				// [TODO] Concider to declare these values as locals in main.
 				for(const auto& var : ast.stageOutputVaryings)
 				{
 					ast.declareVariable(var.type, var.varName, VarTrait_StageOutVarying);
 				}
 
-				// Declare the global unifroms
+				// Declare the global unifroms.
 				for(const auto& unif : ast.uniforms)
 				{
 					ast.declareVariable(unif.type, unif.varName);
@@ -1123,7 +1122,7 @@ namespace XSR
 				}
 			}
 
-			// Finally genrate the code form the AST treee.
+			// Finally genrate the code form the AST three.
 			result += ast.program->GenerateCode(&ast);
 			return true;
 		}
