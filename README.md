@@ -1,4 +1,4 @@
-# XShader(XSR)
+# XShader(XSR) - custom shading language translateable to HLSL and GLSL
 #[CAUTION] : This is a "pre-beta" project that is still in development.
 
 Example minamal vertex shader: 
