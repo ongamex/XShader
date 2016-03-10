@@ -47,7 +47,7 @@ int yywrap(yyscan_t yyscanner)
 	return 1;
 }
 	//The function that knows how to parse the language.
-namespace XSLanguage {
+namespace XSR {
 	bool XSParseExpression(const char* code, Ast* ast)
 	{
 		yyscan_t myscanner;

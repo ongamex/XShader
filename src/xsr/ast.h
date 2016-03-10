@@ -43,6 +43,7 @@ enum Type
 	Type_mat4f,
 
 	Type_Texture2D,
+	Type_TextureCube,
 
 	Type_BuiltInTypeEnd, // Just a marker, pointing right after the last built in type.
 
@@ -67,13 +68,6 @@ struct TypeDesc
 public :
 
 	static std::string GetLangTypeName(const Type type);
-	static bool IsVectorType(const Type type)
-	{
-		if(type == Type_vec2f) return true;
-		if(type == Type_vec3f) return true;
-		if(type == Type_vec4f) return true;
-		return false;
-	}
 	
 public :
 
@@ -84,7 +78,6 @@ public :
 	int GetArraySize() const { return m_arraySize; }
 	void SetArraySize(int arraySize) { m_arraySize = arraySize; }
 
-	bool IsVectorType() const { return IsVectorType(GetBuiltInType()); }
 	bool operator==(const Type type) const { return type == m_type && (m_arraySize == 0); }
 	bool operator!=(const Type type) const { return type != m_type && (m_arraySize == 0); }
 
@@ -100,7 +93,7 @@ public :
 	}
 	bool operator!=(const TypeDesc& other) const { return !(*this == other); }
 	static TypeDesc GetMemberType(const TypeDesc& parent, const std::string& member);
-	std::string GetTypeAsString(const LangSettings& lang) const ;
+	std::string GetTypeAsString(const LangSettings& lang,  bool omitArraySize) const;
 	std::string ComposeVarDecl(const LangSettings& lang, const std::string& varName) const ;
 	
 	Type GetBuiltInType() const { return m_type; }
@@ -394,6 +387,18 @@ struct ExprLiteral : public Node
 
 	TypeDesc type;
 };
+
+// Expression block. Example { expr, expr ... }
+struct ExprBlock : public Node
+{
+	std::vector<Node*> exprs; // the list of expression.
+
+	TypeDesc Internal_DeduceType(Ast* ast) override;
+	std::string Internal_GenerateCode(Ast* ast) override;
+
+	TypeDesc resolvedType;
+};
+
 
 //---------------------------------------------------------------------------------
 // Statements

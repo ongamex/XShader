@@ -34,8 +34,6 @@ bool parseExpression(const std::string& inp);
 %token <int_val>		NUM_INT
 %token 					ATTRIBUTE VARYING UNIFORM NATIVE_CODE
 
-
-
 // Token precedence.
 
 %left AND OR
@@ -51,7 +49,8 @@ bool parseExpression(const std::string& inp);
 
 // Grammar expression types (from yystype).
 %type <node>		fncall_args expr_fncall fndecl_vardecl_var fndecl_vardecl
-%type <node>		expr_base expr stmt
+%type <node>		expr_base expr stmt expr_block 
+%type <node>		expr_block_expressions
 %type <node>		vardecl_var_list vardecl assign_stmt
 %type <node>		stmt_list function_decl 
 %type <node>		program grammar_elem grammar_list
@@ -227,21 +226,30 @@ expr_base :
 	|	expr_base '/' expr_base				{ $$ = ast->push<ExprBin>(EBT_Div, $1, $3); }
 	|	NUM_FLOAT					        { $$ = ast->push<ExprLiteral>($1); }
 	|	NUM_INT						        { $$ = ast->push<ExprLiteral>($1); }
-	|	expr_fncall					        { $$ = $1; }	
+	|	expr_fncall					        { $$ = $1; }
+	|	expr_block							{ $$ = $1; }
 	|	'-' expr_base %prec NONASSOC_UNARY	{ $2->exprSign *= -1; $$ = $2; }
 	|	'+' expr_base %prec NONASSOC_UNARY	{ $$ = $2; }
 	;
 
+	// Expression block. Something like "{expr, expr ...}" example array initialization.
+expr_block_expressions : 
+		expr_base				{ $$ = ast->push<ExprBlock>(); $$->As<ExprBlock>().exprs.push_back($1); }
+	|	expr_block_expressions ',' expr_base	{ $1->As<ExprBlock>().exprs.push_back($3); $$ = $1; } 
+	;
 	
+expr_block :  
+			'{' expr_block_expressions '}'	{ ast->addDeduct($2); $$ = $2; } 
+	;
+
 	// Function arguments as a list.
 fncall_args :
 			{ $$ = ast->push<FuncCall>(); }
-		| 	expr_base
-			{ 
-				Node* fnCall = ast->push<FuncCall>();
-				fnCall->As<FuncCall>().args.push_back($1); 
-				$$ = fnCall;
-			}
+	| 	expr_base { 
+					Node* fnCall = ast->push<FuncCall>();
+					fnCall->As<FuncCall>().args.push_back($1); 
+					$$ = fnCall;
+				  }
 		
 	|	fncall_args ',' expr_base 	{ $1->As<FuncCall>().args.push_back($3); $$ = $1; }
 	

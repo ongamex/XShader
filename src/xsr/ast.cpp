@@ -29,6 +29,7 @@ TypeDesc::TypeDesc(std::string strType, int arraySize)
 	else if(strType == "vec4f") m_type = Type_vec4f;
 	else if(strType == "mat4f") m_type = Type_mat4f;
 	else if(strType == "Texture2D") m_type = Type_Texture2D;
+	else if(strType == "TextureCube") m_type = Type_TextureCube;
 	else { m_type = Type_UserDefined; }
 }
 
@@ -47,6 +48,7 @@ std::string TypeDesc::GetLangTypeName(const Type type)
 	if(type == Type_vec4f) return "vec4f";
 	if(type == Type_mat4f) return "mat4f";
 	if(type == Type_Texture2D) return "Texture2D";
+	if(type == Type_TextureCube) return "TextureCube";
 
 	throw ParseExcept("GetLangTypeName called with unknow argument");
 }
@@ -95,23 +97,33 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 	throw ParseExcept("Unknown member access: " + member);
 }
 
-std::string TypeDesc::GetTypeAsString(const LangSettings& lang) const 
+std::string TypeDesc::GetTypeAsString(const LangSettings& lang, bool omitArraySize) const 
 {
-	if(GetBuiltInType() == Type_void) return "void";
-	else if(GetBuiltInType() == Type_int) return "int";
-	else if(GetBuiltInType() == Type_float) return "float";
-	else if(GetBuiltInType() == Type_bool) return "bool";
-	else if(GetBuiltInType() == Type_vec2f) { if(lang.outputLanguage == OL_HLSL) return "float2"; else return "vec2"; }
-	else if(GetBuiltInType() == Type_vec3f) { if(lang.outputLanguage == OL_HLSL) return "float3"; else return "vec3"; }
-	else if(GetBuiltInType() == Type_vec4f) { if(lang.outputLanguage == OL_HLSL) return "float4"; else return "vec4"; }
-	else if(GetBuiltInType() == Type_mat4f) { if(lang.outputLanguage == OL_HLSL) return "float4x4"; else return "mat4"; }
-	else if(GetBuiltInType() == Type_Texture2D) { if(lang.outputLanguage == OL_HLSL) return "Texture2D"; else return "sampler2D"; } 
-	else if(GetBuiltInType() == Type_UserDefined) {
-		if(m_strType.empty()) return "<empty-str-type>";
-		return m_strType;
+	std::string retval;
+	if(GetBuiltInType() == Type_void) retval = "void";
+	else if(GetBuiltInType() == Type_int) retval = "int";
+	else if(GetBuiltInType() == Type_float) retval = "float";
+	else if(GetBuiltInType() == Type_bool) retval = "bool";
+	else if(GetBuiltInType() == Type_vec2f) { if(lang.outputLanguage == OL_HLSL) retval = "float2"; else retval = "vec2"; }
+	else if(GetBuiltInType() == Type_vec3f) { if(lang.outputLanguage == OL_HLSL) retval = "float3"; else retval = "vec3"; }
+	else if(GetBuiltInType() == Type_vec4f) { if(lang.outputLanguage == OL_HLSL) retval = "float4"; else retval = "vec4"; }
+	else if(GetBuiltInType() == Type_mat4f) { if(lang.outputLanguage == OL_HLSL) retval = "float4x4"; else retval = "mat4"; }
+	else if(GetBuiltInType() == Type_Texture2D) { if(lang.outputLanguage == OL_HLSL) retval = "Texture2D"; else retval = "sampler2D"; } 
+	else if(GetBuiltInType() == Type_UserDefined)
+	{
+		if(m_strType.empty()) retval = "<empty-str-type>";
+		retval = m_strType;
 	}
 
-	return "<type-unknown>";
+	if(omitArraySize == false)
+	{
+		char arraySizeStr[32];
+		sprintf(arraySizeStr, "[%d]", m_arraySize);
+
+		retval += arraySizeStr;
+	}
+
+	return retval;
 }
 
 std::string TypeDesc::ComposeVarDecl(const LangSettings& lang, const std::string& varName) const
@@ -120,10 +132,10 @@ std::string TypeDesc::ComposeVarDecl(const LangSettings& lang, const std::string
 	{
 		char arraySuffix[32];
 		sprintf(arraySuffix, "[%d]", m_arraySize);
-		return GetTypeAsString(lang) + " " + varName + arraySuffix;
+		return GetTypeAsString(lang, true) + " " + varName + arraySuffix;
 	}
 
-	return GetTypeAsString(lang) + " " + varName;
+	return GetTypeAsString(lang, true) + " " + varName;
 }
 
 //-----------------------------------------------------------------------
@@ -273,6 +285,7 @@ void Ident::Internal_Declare(Ast* ast)
 
 TypeDesc Ident::Internal_DeduceType(Ast* ast)
 {
+	// [NOTE] Currently resolved in "Declaration" step, this is a mistake and must get fixed.
 	return resolvedFvd->type;
 }
 
@@ -457,11 +470,36 @@ TypeDesc ExprIndexing::Internal_DeduceType(Ast* ast)
 //------------------------------------------------------------------------------
 std::string FuncCall::Internal_GenerateCode(Ast* ast)
 {
-	// Check if this is a special function.
-
+	// First check if this is a special function (determined by the name of the function). 
+	// If so do the special logic.
 	if(fnName == "takeSample")
 	{
-		if(args.size() != 2) throw ParseExcept("takeSample called with wrong number of argumnets.");
+		if(args.size() != 2)
+		{
+			throw ParseExcept("takeSample called with wrong number of argumnets.");
+		}
+
+		const TypeDesc typeArg0 = args[0]->DeduceType(ast);
+		const TypeDesc typeArg1 = args[1]->DeduceType(ast);
+
+		if(typeArg0 == Type_Texture2D)
+		{
+			if(typeArg1 != Type_vec2f)
+			{
+				throw ParseExcept("Invalid call to takeSample(Texture2D texture, vec2f samplingUV).");
+			}
+		}
+		else if(typeArg0 == Type_TextureCube)
+		{
+			if(typeArg1 != Type_vec3f)
+			{
+				throw ParseExcept("Invalid call to takeSample(TextureCube texture, vec3f samplingNormal).");
+			}
+		}
+		else
+		{
+			throw ParseExcept("Invalid call to takeSample(<TextureType>, <samplingArgs>)");
+		}
 
 		const std::string textureCode = args[0]->GenerateCode(ast);
 		const std::string samplingPtCode = args[1]->GenerateCode(ast);
@@ -476,49 +514,56 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 		{
 			return "texture2D(" + textureCode + "," + samplingPtCode + ")";
 		}
-	}
-
-	// Discarded as a function call
-	// [TODO] concider adding a boolen argument.
-	if(fnName == "discard") {
-		return "discard;";
-	}
-
-	std::string callFnName; // Stores the actual function name that will be called.
-
-	// Check if this is a type constructor.
-	for(int t = Type_BuiltInTypeBegin + 1; t < Type_BuiltInTypeEnd; ++t)
-	{
-		const std::string typeName = TypeDesc::GetLangTypeName((Type)t);
-		
-		if(fnName == typeName) 
+		else
 		{
-			TypeDesc type((Type)t);
-			//Assert(type.GetArraySize() == 0); //[TODO] Arrays if possible.
-			callFnName = type.GetTypeAsString(ast->lang);
-			break;
+			throw ParseExcept("Unvalid code path in FuncCall::Internal_GenerateCode.");
 		}
 	}
-
-	// Both hlsl and glsl lerp/mix functions are supported.
-	if(ast->OutLangIs(OL_HLSL) && fnName == "mix") callFnName = "lerp";
-	if(ast->OutLangIs(OL_GLSL) && fnName == "lerp") callFnName = "mix";
 	
-	// If this is just a regular fn call.
-	if(callFnName.empty()) {
-		callFnName = fnName;
+	else if(fnName == "discard") 
+	{
+		// Discarded as a function call.
+		return "discard;";
 	}
+	else 
+	{
+		// Regular functions.
+		std::string callFnName; // Stores the actual function name that will be called.
 
-	std::string retval = callFnName + '(';
+		// Check if this is a type constructor (vec3f(...) vec4f(...) ect...)
+		for(int t = Type_BuiltInTypeBegin + 1; t < Type_BuiltInTypeEnd; ++t)
+		{
+			const std::string typeName = TypeDesc::GetLangTypeName((Type)t);
+		
+			if(fnName == typeName) 
+			{
+				TypeDesc type((Type)t);
+				//Assert(type.GetArraySize() == 0); //[TODO] Arrays if possible.
+				callFnName = type.GetTypeAsString(ast->lang, true);
+				break;
+			}
+		}
+
+		// Both hlsl and glsl lerp/mix functions are supported.
+		if(ast->OutLangIs(OL_HLSL) && fnName == "mix") callFnName = "lerp";
+		if(ast->OutLangIs(OL_GLSL) && fnName == "lerp") callFnName = "mix";
 	
-	for(int t = 0; t < args.size(); ++t) {
-		retval += args[t]->GenerateCode(ast);
-		if(t < args.size() - 1) retval += ",";
+		// If this is just a regular fn call.
+		if(callFnName.empty()) {
+			callFnName = fnName;
+		}
+
+		std::string retval = callFnName + '(';
+	
+		for(int t = 0; t < args.size(); ++t) {
+			retval += args[t]->GenerateCode(ast);
+			if(t < args.size() - 1) retval += ",";
+		}
+
+		retval += ')';
+	
+		return retval;
 	}
-
-	retval += ')';
-	
-	return retval;
 }
 
 void FuncCall::Internal_Declare(Ast* ast)
@@ -534,8 +579,8 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 	// Function calls type deduction has special behavior for some specific functions that is hardcoded here.
 	// The right thing to do is to support multiple function declaration(based on the argument types),
 	// but currently these functions are the only real cases(or at least known to me).
-	if(	fnName == "lerp" || fnName == "mix" // linear interpolation support both hlsl "lerp" and glsl "mix".
-		|| fnName == "clamp")
+	// linear interpolation support both hlsl "lerp" and glsl "mix".
+	if(	fnName == "lerp" || fnName == "mix" || fnName == "clamp")
 	{
 		if(args.size() != 3) throw ParseExcept("lerp called with wrong arg count(should be 3: x a,b)");
 
@@ -554,8 +599,14 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 
 		if(td0 != td1) throw ParseExcept("dot called with mixed arguments."); 
 
-		if(td0 == Type_vec2f || td0 == Type_vec3f || td0 == Type_vec4f) resolvedType = Type_float;
-		else throw ParseExcept("dot called with unknown argument type");
+		if(td0 == Type_vec2f || td0 == Type_vec3f || td0 == Type_vec4f)
+		{
+			resolvedType = Type_float;
+		}
+		else
+		{
+			throw ParseExcept("dot called with unknown argument type");
+		}
 	}
 
 	if(fnName == "cross")
@@ -574,8 +625,14 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 		if(args.size() != 1) throw ParseExcept("normalize must be called with exactly one argument.");
 
 		const TypeDesc& td = args[0]->DeduceType(ast);
-		if(td == Type_vec2f || td == Type_vec3f || td == Type_vec4f) resolvedType = td;
-		else throw ParseExcept("normalize called with unknow arg type!");
+		if(td == Type_vec2f || td == Type_vec3f || td == Type_vec4f)
+		{
+			resolvedType = td;
+		}
+		else
+		{
+			throw ParseExcept("normalize isnt't defined for this type!");
+		}
 	}
 
 	// Check if this is a type constructor.
@@ -610,7 +667,7 @@ std::string ExprLiteral::Internal_GenerateCode(Ast* ast)
 	{
 		sprintf(buff, "%f", float_val);
 
-		// kill the trailing zeroes.
+		// Kill the trailing zeroes.
 		for(int t = strlen(buff);t > 1; --t){
 			if(buff[t] == '0' && buff[t-1] == '0') {
 				buff[t] = '\0';
@@ -623,15 +680,84 @@ std::string ExprLiteral::Internal_GenerateCode(Ast* ast)
 	else if(type.GetBuiltInType() == Type_int)
 	{
 		sprintf(buff, "%d", int_val);
+
 		return buff;
 	}
 
-	return "???";
+	throw ParseExcept("Unknown literal type");
 }
 
 TypeDesc ExprLiteral::Internal_DeduceType(Ast* ast) 
 {
 	return type;
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+TypeDesc ExprBlock::Internal_DeduceType(Ast* ast)
+{
+	if(resolvedType == Type_Undeduced)
+	{
+		if(exprs.size() == 0) {
+			throw ParseExcept("Invalid ExprBlock. No expressions are specified");
+		}
+
+		// All types should match, otherwise this block is invalid.
+		resolvedType = exprs[0]->DeduceType(ast);
+		for(int t = 1; t < exprs.size(); ++t)
+		{
+			if(resolvedType != exprs[t]->DeduceType(ast))
+			{
+				throw ParseExcept("Mixed types in ExprBlock");
+			}
+		}
+
+		resolvedType.SetArraySize(exprs.size());
+	}
+
+	return resolvedType;
+}
+
+std::string ExprBlock::Internal_GenerateCode(Ast* ast)
+{
+	if(ast->OutLangIs(OL_HLSL))
+	{
+		std::string retval = "{";
+
+		for(int t = 0; t < exprs.size(); ++t)
+		{
+			retval += exprs[t]->GenerateCode(ast);
+			retval += ',';
+		}
+
+		// Replace the last comma with }.
+		retval.back() = '}';
+
+		return retval;
+	}
+	else if(ast->OutLangIs(OL_GLSL))
+	{
+		std::string retval = resolvedType.GetTypeAsString(ast->lang, false);
+		retval += "(";
+
+		for(int t = 0; t < exprs.size(); ++t)
+		{
+			retval += exprs[t]->GenerateCode(ast);
+			retval += ',';
+		}
+
+		// Replace the last comma with ).
+		retval.back() = ')';
+
+		return retval;
+	}
+	else
+	{
+		throw ParseExcept("Unknown output language!");
+	}
+
+	return "{not-implemented}";
 }
 
 //------------------------------------------------------------------------------
@@ -785,11 +911,10 @@ std::string VarDecl::Internal_GenerateCode(Ast* ast)
 {
 	std::string retval;
 
-
 	if(type.IsArray() == false)
 	{
 		// Non-Arrays
-		retval += type.GetTypeAsString(ast->lang) + " ";
+		retval += type.GetTypeAsString(ast->lang, true) + " ";
 
 		for(int t = 0; t < ident.size(); ++t)
 		{
@@ -803,7 +928,7 @@ std::string VarDecl::Internal_GenerateCode(Ast* ast)
 		// Arrays
 		char arraysSuffux[32] = { 0 };
 		sprintf(arraysSuffux, "[%d]", type.GetArraySize() );
-		const std::string typeAsString = type.GetTypeAsString(ast->lang) + " ";
+		const std::string typeAsString = type.GetTypeAsString(ast->lang, true) + " ";
 
 		for(int t = 0; t < ident.size(); ++t)
 		{
@@ -834,7 +959,7 @@ std::string FnDeclArgVarDecl::Internal_GenerateCode(Ast* ast)
 	if(argType == FNAT_InOut) retval += "inout ";
 	if(argType == FNAT_Out) retval += "out ";
 
-	retval += type.GetTypeAsString(ast->lang) + " " + ident;
+	retval += type.GetTypeAsString(ast->lang, true) + " " + ident;
 	if(expr) retval += "=" + expr->GenerateCode(ast);
 	return retval;
 }
@@ -860,7 +985,7 @@ std::string FuncDecl::Internal_GenerateCode(Ast* ast)
 	else
 	{
 		// Just a regular function.
-		retval = retType.GetTypeAsString(ast->lang) + " " + name + "(";
+		retval = retType.GetTypeAsString(ast->lang, true) + " " + name + "(";
 
 		for(int t = 0; t < args.size(); ++t) {
 			retval += args[t]->GenerateCode(ast);
@@ -884,13 +1009,13 @@ std::string FuncDecl::GenerateMainFuncHLSL(Ast* ast)
 
 		// The user specified output varyings.
 		for(const auto& var : ast->stageOutputVaryings) {
-			retval += var.type.GetTypeAsString(ast->lang) + " " + var.varName + " : " + var.varName + ";";
+			retval += var.type.GetTypeAsString(ast->lang, true) + " " + var.varName + " : " + var.varName + ";";
 		}
 
 		// Stage specific output with SV_*.
 		for(const auto& var : ast->keywordVariablesMentioned) {
 			if(var->trait == VarTrait_StageSpecificOutput)
-			retval += var->type.GetTypeAsString(ast->lang) + " " + var->fullName + " : " + var->hlslSemantic + ";";
+			retval += var->type.GetTypeAsString(ast->lang, true) + " " + var->fullName + " : " + var->hlslSemantic + ";";
 		}
 
 		retval += "};";
@@ -1007,7 +1132,7 @@ namespace XSR
 				//ast.declareFunction(Type_float, "lerp"); // Lerp is called mix in GLSL. This case is handled in FuncCall.
 				//ast.declareFunction(Type_float, "clamp");
 
-				// For hlsl trigonometrix functions have vector type specializations, but for now lets pretend
+				// For hlsl trigonometric functions have vector type specializations, but for now lets pretend
 				// that there isn't.
 				ast.declareFunction(Type_float, "sin");
 				ast.declareFunction(Type_float, "cos");
@@ -1028,7 +1153,6 @@ namespace XSR
 
 				// Pixel shader discard statement. We define it as a function.
 				ast.declareFunction(Type_void, "discard");
-
 			}
 
 			// Declare the vertex attributes, io varyings, and uniforms.
