@@ -1106,27 +1106,20 @@ namespace XSR
 	bool XSParseExpression(const char* code, Ast* ast);
 
 	bool XSCompileCode(
-			const char* const pCode, 
-			const LangSettings langSettings,
-			std::string& result,
-			std::string& compilationErrors)
+		const char* const pCode, 
+		const LangSettings langSettings,
+		std::string& result,
+		std::string& compilationErrors)
 	{
 		try 
 		{
 			Ast ast;
 			ast.lang = langSettings;
 
-			// For some reason FLEX doens't like '\r' symbol (maybe there are others as well...)
+			// [CAUTION] For some reason FLEX doens't like '\r' symbol (maybe there are others as well...)
 			// It crashes randomly somewhere in isatty...
 			std::string processedCode = pCode;
-
-			for(size_t t = 0; t < processedCode.size(); ++t)
-			{
-				if(processedCode[t] == '\r') {
-					processedCode[t] = ' ';
-				}
-			}
-
+			std::replace(processedCode.begin(), processedCode.end(), '\r', ' ');
 
 			XSParseExpression(processedCode.c_str(), &ast); // Build the AST tree.
 
@@ -1172,8 +1165,8 @@ namespace XSR
 			{
 				// Declare all the keyword variables...
 				// The languages uses the glsl-style of returning/obtaining stage specific variables.
-				// These variables are always implicitly defined(some of there are defined only if they are used).
-				// There is a "mentioned" list stored in the Ast that holds a list of mentioned variables.
+				// These variables are always implicitly defined(some of them are defined only if used).
+				// There is a "mentioned" list stored in the AST that holds a list of mentioned variables in the user's code.
 				{
 					// Vertex shader outputs
 					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_VertexOut", TypeDesc(Type_vec4f), VarTrait_StageSpecificOutput, "SV_Position", "gl_Position"));
@@ -1215,7 +1208,9 @@ namespace XSR
 			ast.program->Declare(&ast);
 
 			// Deduce a type for every expression that was matched by bison.
-			for(auto n : ast.deductionQueue) n->DeduceType(&ast);
+			for(auto n : ast.deductionQueue) {
+				n->DeduceType(&ast);
+			}
 
 			// CODE GENERATION....
 
@@ -1226,32 +1221,28 @@ namespace XSR
 
 				// Keep in mind that in GLSL there are no sematics. So for vertex attributes
 				// we are going to output the semantic rater than the variable name.
-				for(const auto& var : ast.vertexAttribs)
-				{
+				for(const auto& var : ast.vertexAttribs) {
 					result += "attribute " + var.type.ComposeVarDecl(ast.lang, var.semantic) + ";";
 				}
 
-				for(const auto& var : ast.stageInputVaryings)
-				{
-					// [TODO] for older versions of GLSL this should be "vaying" instead of in
+				for(const auto& var : ast.stageInputVaryings) {
+					// [TODO] for older versions of GLSL this should be "vaying" instead of "in".
 					result += "in " + var.type.ComposeVarDecl(ast.lang, var.varName) + ";";
 				}
 
-				for(const auto& var : ast.stageOutputVaryings)
-				{
+				for(const auto& var : ast.stageOutputVaryings) {
 					// [TODO] for older versions of GLSL this should be "vaying" instead of out
 					result += "out " + var.type.ComposeVarDecl(ast.lang, var.varName) + ";";
 				}
 			}
 
-			// GENERATE the declaration code for uniforms for both GLSL and HLSL
+			// GENERATE the declaration code for uniforms for both GLSL and HLSL.
 			for(const auto& unif : ast.uniforms)
 			{
 				result += "uniform " + unif.type.ComposeVarDecl(ast.lang, unif.varName) + ";";
 
-				// Texture for HLSL need a sampler. Define 1 sampler for every texture.
-				if(ast.lang.outputLanguage == OL_HLSL)
-				{
+				// Textures in HLSL need a sampler. Define 1 sampler for every texture.
+				if(ast.lang.outputLanguage == OL_HLSL) {
 					//[TODO] Arrays...
 					if(unif.type.GetBuiltInType() == Type_Texture2D) {
 						result += "uniform sampler " + unif.varName  + "_sgeSS;";
