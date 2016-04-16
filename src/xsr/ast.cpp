@@ -1115,7 +1115,20 @@ namespace XSR
 		{
 			Ast ast;
 			ast.lang = langSettings;
-			XSParseExpression(pCode, &ast); // Build the AST tree.
+
+			// For some reason FLEX doens't like '\r' symbol (maybe there are others as well...)
+			// It crashes randomly somewhere in isatty...
+			std::string processedCode = pCode;
+
+			for(size_t t = 0; t < processedCode.size(); ++t)
+			{
+				if(processedCode[t] == '\r') {
+					processedCode[t] = ' ';
+				}
+			}
+
+
+			XSParseExpression(processedCode.c_str(), &ast); // Build the AST tree.
 
 			if(!ast.program) {
 				throw ParseExcept("Failed while compiling program!");
