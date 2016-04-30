@@ -584,8 +584,9 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 	{
 		if(args.size() != 3) throw ParseExcept("lerp called with wrong arg count(should be 3: x a,b)");
 
-		if(args[0]->DeduceType(ast) != Type_float) throw ParseExcept("lerp interpolation coeff isn't  a float!"); // the interpolation coeff must be a float.
-		if(args[1]->DeduceType(ast) != args[2]->DeduceType(ast)) throw ParseExcept("lerp mixed arguments type");
+		if(args[0]->DeduceType(ast) != args[1]->DeduceType(ast)) throw ParseExcept("lerp mixed arguments type");
+		if(args[2]->DeduceType(ast) != Type_float) throw ParseExcept("lerp interpolation coeff isn't  a float!"); // the interpolation coeff must be a float.
+		
 
 		resolvedType = args[1]->DeduceType(ast);
 	}
