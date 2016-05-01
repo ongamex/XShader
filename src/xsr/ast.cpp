@@ -1125,7 +1125,7 @@ namespace XSR
 			XSParseExpression(processedCode.c_str(), &ast); // Build the AST tree.
 
 			if(!ast.program) {
-				throw ParseExcept("Failed while compiling program!");
+				throw ParseExcept(ast.bisonParseError.empty() ? "Failed while compiling program!" : ast.bisonParseError);
 			}
 
 			// Declare the predefined functions for the language.

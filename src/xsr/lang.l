@@ -1,18 +1,25 @@
-%option reentrant bison-bridge 
+%option reentrant 
+%option bison-bridge 
+%option bison-locations
+%option yylineno
 
 %{
 #include <stdio.h>
 #include <string>
 #include "ast.h"
 #include "lang.tab.h"
-
 #include "lang.yystype.h"
 
-void yyerror (yyscan_t yyscanner, char const *msg);
+//		YYLTYPE* lval = yyget_lloc(yyscanner);
+#define YY_USER_ACTION yylloc->first_line = yylloc->last_line = yylineno;
+
+//void yyerror (YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
 %}
 
 %%
-"//".*[\n]											;
+
+
+"//".*[\n]			{}
 \"(\\.|[^"])*\"		{ 
 						// remove the heading and trailing "
 						yylval->str_val = std::string(yytext+1); yylval->str_val.pop_back(); 
@@ -58,6 +65,11 @@ namespace XSR {
 		
 		/*Copy string into new buffer and Switch buffers*/
 		yy_scan_string(code, myscanner);
+		
+		// [HACK] Those are not properly initialized for non file parsers
+		// and becuase of that we get garbage in yyerror...
+		yylineno = 1;
+        yycolumn = 0;
 		
 		bool nasi = yyparse(myscanner, ast);
 		yylex_destroy(myscanner);

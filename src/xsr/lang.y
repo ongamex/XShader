@@ -1,21 +1,24 @@
 %define api.pure full
+%locations
+%error-verbose
 %lex-param {yyscan_t scanner}
 %parse-param {yyscan_t scanner}
 %parse-param {Ast* ast}
 
 %{
+typedef void* yyscan_t;
 
 #include <string>
 #include <cstring>
 #include <math.h>
 #include <map>
 #include "ast.h"
+#include "lang.tab.h"
 #include "lang.yystype.h"
 
-typedef void* yyscan_t;
-void yyerror (yyscan_t yyscanner, char const *msg);
-void yyerror (yyscan_t yyscanner, Ast* ast, char const *msg);
-int yylex(YYSTYPE *yylval_param, yyscan_t yyscanner);
+int yylex(YYSTYPE*, YYLTYPE*, yyscan_t);
+void yyerror (YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
+
 bool parseExpression(const std::string& inp);
 
 %}
@@ -266,10 +269,8 @@ expr_fncall :
 
 %%
 
-void yyerror (yyscan_t yyscanner, char const *msg){
-    fprintf(stderr, "%s\n", msg);
-}
-
-void yyerror (yyscan_t yyscanner, Ast* ast, char const *msg) {
-	yyerror(yyscanner, msg);
+void yyerror(struct YYLTYPE* yyErrorLoc ,void* s,struct Ast* ast,char const* msg){
+	char temp[512];
+	snprintf(temp, sizeof(temp), "Error(line %d) %s", yyErrorLoc->first_line, msg);
+	ast->bisonParseError = temp;
 }

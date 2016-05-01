@@ -254,6 +254,8 @@ struct Ast
 		TypeDesc retType;
 	};
 
+	std::string bisonParseError;
+
 	// Declares a variable at the current scope
 	const FullVariableDesc* declareVariable(const TypeDesc& td, const std::string& name,  VarTrait trait = VarTrait_Regular);
 	void declareFunction(const TypeDesc& returnType, const std::string& name);
