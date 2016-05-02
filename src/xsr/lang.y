@@ -57,8 +57,9 @@ bool parseExpression(const std::string& inp);
 %type <node>		vardecl_var_list vardecl assign_stmt
 %type <node>		stmt_list function_decl 
 %type <node>		program grammar_elem grammar_list
-%type <typeDesc> 	shader_gvar_type
 %type <node>		shader_globals // These actually have no type.
+%type <typeNode>	variable_type_ident_list variable_type_arrays 
+%type <typeNode>	variable_type
 
 // The root.
 %start program
@@ -92,20 +93,32 @@ grammar_list :
 		}
 	;
 	
+variable_type_ident_list :
+		IDENT									{ $$ = ast->push<TypeNode>(); $$->As<TypeNode>().identifiers.push_back($1); }
+	// Shift-Reduce here
+	|	variable_type_ident_list IDENT      	{ $1->As<TypeNode>().identifiers.push_back($2); $$ = $1; }
+	;
+
+variable_type_arrays : 
+		variable_type_ident_list				{ $$ = $1; }
+	|	variable_type_arrays '[' NUM_INT ']'	{ $$ = $1; $$->As<TypeNode>().arraySizes.push_back($3); }
+	;
+
+variable_type : 
+		variable_type_arrays					{ $$ = $1; }
+	;
+
+
 	//-------------------------------------------------
 	// Global variables, uniforms, varyings, attributes
 	//-------------------------------------------------
-	
-shader_gvar_type : 
-		IDENT					{ $$ = TypeDesc($1); }
-	|	IDENT '[' NUM_INT ']'	{ $$ = TypeDesc($1, $3); }
 		
 shader_globals : 
-		// These aren't real nodes for now in order to reduce comprexity...
-		ATTRIBUTE shader_gvar_type IDENT ':' IDENT ';'	{ $$ = nullptr; ast->vertexAttribs.push_back({$2, $3, $5}); }
-	|	IN        shader_gvar_type IDENT ';'			{ $$ = nullptr; ast->stageInputVaryings.push_back({$2, $3}); }
-	|	OUT       shader_gvar_type IDENT ';'			{ $$ = nullptr; ast->stageOutputVaryings.push_back({$2, $3}); }
-	|	UNIFORM	  shader_gvar_type IDENT ';'			{ $$ = nullptr; ast->uniforms.push_back({$2, $3}); }
+		// These aren't real nodes for now in order to reduce the complexity...
+		ATTRIBUTE variable_type IDENT ':' IDENT ';'	{ $$ = nullptr; ast->vertexAttribs.emplace_back($2, $3, $5); }
+	|	IN        variable_type IDENT ';'			{ $$ = nullptr; ast->stageInputVaryings.push_back({$2, $3}); }
+	|	OUT       variable_type IDENT ';'			{ $$ = nullptr; ast->stageOutputVaryings.push_back({$2, $3}); }
+	|	UNIFORM	  variable_type IDENT ';'			{ $$ = nullptr; ast->uniforms.push_back({$2, $3}); }
 	;
 	
 	//-------------------------------------------------
@@ -114,14 +127,14 @@ shader_globals :
 	
 	// A single variable for function declarations.
 fndecl_vardecl_var : 
-		IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($1), $2, nullptr, FNAT_In   ); }
-	|	IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($1), $2, $4     , FNAT_In   ); }
-	|	IN IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, nullptr, FNAT_In	); }
-	|	IN IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, $5     , FNAT_In	); }
-	|	OUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, nullptr, FNAT_Out  ); }
-	|	OUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, $5     , FNAT_Out  ); }
-	|	INOUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, nullptr, FNAT_InOut); }
-	|	INOUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, $5     , FNAT_InOut); }
+		variable_type IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>($1, $2, nullptr, FNAT_In   ); }
+	|	variable_type IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>($1, $2, $4     , FNAT_In   ); }
+	|	IN variable_type IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>($2, $3, nullptr, FNAT_In	); }
+	|	IN variable_type IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>($2, $3, $5     , FNAT_In	); }
+	|	OUT variable_type IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>($2, $3, nullptr, FNAT_Out  ); }
+	|	OUT variable_type IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>($2, $3, $5     , FNAT_Out  ); }
+	|	INOUT variable_type IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>($2, $3, nullptr, FNAT_InOut); }
+	|	INOUT variable_type IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>($2, $3, $5     , FNAT_InOut); }
 	;
 	
 	// A list of variables for the function declaration.
@@ -138,9 +151,9 @@ fndecl_vardecl :
 	// fndecl_vardecl create the function call node, 
 	// we need to just add the return type name and statement.
 function_decl : 
-	IDENT IDENT '(' fndecl_vardecl ')' '{' stmt_list '}'	{ 
+	variable_type IDENT '(' fndecl_vardecl ')' '{' stmt_list '}'	{ 
 		auto& funcDecl = $4->As<FuncDecl>();
-		funcDecl.retType = TypeDesc($1);
+		funcDecl.retType = $1;
 		funcDecl.name = $2;
 		funcDecl.stmt = $7;
 		$$ = $4;
@@ -154,8 +167,8 @@ function_decl :
 	// A single variable(or a variable list followed by a single variable) and the optional assigment expression
 	// type var, var = expr;
 vardecl_var_list : 
-		IDENT 								{ $$ = ast->push<VarDecl>(TypeDesc(), $1, nullptr); }
-	|	IDENT '=' expr 						{ $$ = ast->push<VarDecl>(TypeDesc(), $1, $3); }
+		IDENT 								{ $$ = ast->push<VarDecl>(nullptr, $1, nullptr); }
+	|	IDENT '=' expr 						{ $$ = ast->push<VarDecl>(nullptr, $1, $3); }
 	|	vardecl_var_list ',' IDENT 			{ 
 			$1->As<VarDecl>().ident.push_back($3);
 			$1->As<VarDecl>().expr.push_back(nullptr);
@@ -169,8 +182,7 @@ vardecl_var_list :
 	
 	// The actual variable declaration
 vardecl :
-			IDENT vardecl_var_list	{ $2->As<VarDecl>().type = TypeDesc($1); $$ = $2; }
-		|	IDENT '[' NUM_INT ']' vardecl_var_list { $5->As<VarDecl>().type = TypeDesc($1, $3); $$ = $5; }
+			variable_type vardecl_var_list	{ $2->As<VarDecl>().typeNode = $1; $$ = $2; }
 	;
 	
 	//-------------------------------------------------

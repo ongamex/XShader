@@ -10,6 +10,8 @@
 using namespace XSR;
 
 struct Ast;
+struct Node;
+struct TypeNode;
 
 struct ParseExcept : public std::exception {
 	ParseExcept(const char* msg) :
@@ -129,20 +131,36 @@ enum FnCallArgType
 
 struct VertexAttribs
 {
-	TypeDesc type;
+	VertexAttribs(TypeNode* const typeNode = nullptr, const std::string& varName = std::string(), const std::string& semantic = std::string()) :
+		typeNode(typeNode),
+		varName(varName),
+		semantic(semantic)
+	{}
+
+	TypeNode* typeNode = nullptr;
 	std::string varName;
 	std::string semantic;
 };
 
 struct Varyings
 {
-	TypeDesc type;
+	Varyings(TypeNode* const typeNode = nullptr, const std::string& varName = std::string()) : 
+		typeNode(typeNode),
+		varName(varName)
+	{}
+
+	TypeNode* typeNode = nullptr;
 	std::string varName;
 };
 
 struct Uniforms
 {
-	TypeDesc type;
+	Uniforms(TypeNode* const typeNode = nullptr, const std::string& varName = std::string()) :
+		typeNode(typeNode),
+		varName(varName)
+	{}
+
+	TypeNode* typeNode = nullptr;
 	std::string varName;
 };
 
@@ -304,6 +322,14 @@ struct Ident : public Node
 
 	std::string identifier;
 	const Ast::FullVariableDesc* resolvedFvd = nullptr;
+};
+
+struct TypeNode : public Node
+{
+	TypeDesc GenerateTypeDesc() const;
+
+	std::vector<int> arraySizes; // The array sizes. If none, the variable is not an array.
+	std::vector<std::string> identifiers; // A list of all identifiers that participate in the type decl example is: "in const int"
 };
 
 struct ExprMemberAccess : public Node
@@ -491,8 +517,8 @@ struct VarDecl : public Node
 {
 	VarDecl() = default;
 
-	VarDecl(TypeDesc type, std::string firstIdent, Node* firstExpr) : 
-		type(type)
+	VarDecl(TypeNode* typeNode, std::string firstIdent, Node* firstExpr) :
+		typeNode(typeNode)
 	{
 		ident.push_back(firstIdent);
 		expr.push_back(firstExpr);
@@ -501,7 +527,7 @@ struct VarDecl : public Node
 	std::string Internal_GenerateCode(Ast* ast) override;
 	void Internal_Declare(Ast* ast) override;
 
-	TypeDesc type;//std::string type;
+	TypeNode* typeNode;
 	std::vector<std::string> ident;
 	std::vector<Node*> expr;
 };
@@ -514,14 +540,14 @@ struct FnDeclArgVarDecl : public Node
 {
 	FnDeclArgVarDecl() = default;
 
-	FnDeclArgVarDecl(TypeDesc type, const std::string& ident, Node* const expr, FnCallArgType argType) :
-		type(type), ident(ident), expr(expr), argType(argType)
+	FnDeclArgVarDecl(TypeNode* typeNode, const std::string& ident, Node* const expr, FnCallArgType argType) :
+		typeNode(typeNode), ident(ident), expr(expr), argType(argType)
 	{}
 
 	std::string Internal_GenerateCode(Ast* ast) override;
 	void Internal_Declare(Ast* ast) override;
 
-	TypeDesc type;//std::string type;
+	TypeNode* typeNode;
 	std::string ident; // The name of the variable.
 	Node* expr;
 	FnCallArgType argType; //in/out/inout.
@@ -531,7 +557,7 @@ struct FnDeclArgVarDecl : public Node
 struct FuncDecl : public Node
 {
 	std::vector<Node*> args;
-	TypeDesc retType;//std::string retType;
+	TypeNode* retType;
 	std::string name;
 
 	std::string Internal_GenerateCode(Ast* ast) override;

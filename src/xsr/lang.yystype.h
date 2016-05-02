@@ -5,10 +5,11 @@
 struct LangYYSTYPE
 {
 	std::string str_val;
-	TypeDesc typeDesc;
+
 	union 
 	{
 		struct Node* node;
+		struct TypeNode* typeNode;
 		float float_val;
 		int int_val;
 	};

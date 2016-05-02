@@ -911,7 +911,7 @@ void StmtList::Internal_Declare(Ast* ast)
 std::string VarDecl::Internal_GenerateCode(Ast* ast)
 {
 	std::string retval;
-
+	const TypeDesc type = typeNode->GenerateTypeDesc();
 	if(type.IsArray() == false)
 	{
 		// Non-Arrays
@@ -944,6 +944,7 @@ std::string VarDecl::Internal_GenerateCode(Ast* ast)
 
 void VarDecl::Internal_Declare(Ast* ast)
 {
+	const TypeDesc type = typeNode->GenerateTypeDesc();
 	for(int t = 0; t < ident.size(); ++t)
 	{
 		ast->declareVariable(type, ident[t]);
@@ -960,6 +961,8 @@ std::string FnDeclArgVarDecl::Internal_GenerateCode(Ast* ast)
 	if(argType == FNAT_InOut) retval += "inout ";
 	if(argType == FNAT_Out) retval += "out ";
 
+	const TypeDesc type = typeNode->GenerateTypeDesc();
+
 	retval += type.GetTypeAsString(ast->lang, true) + " " + ident;
 	if(expr) retval += "=" + expr->GenerateCode(ast);
 	return retval;
@@ -967,6 +970,7 @@ std::string FnDeclArgVarDecl::Internal_GenerateCode(Ast* ast)
 
 void FnDeclArgVarDecl::Internal_Declare(Ast* ast)
 {
+	const TypeDesc type = typeNode->GenerateTypeDesc();
 	ast->declareVariable(type, ident);
 }
 
@@ -986,7 +990,8 @@ std::string FuncDecl::Internal_GenerateCode(Ast* ast)
 	else
 	{
 		// Just a regular function.
-		retval = retType.GetTypeAsString(ast->lang, true) + " " + name + "(";
+		const TypeDesc type = retType->GenerateTypeDesc();
+		retval = type.GetTypeAsString(ast->lang, true) + " " + name + "(";
 
 		for(int t = 0; t < args.size(); ++t) {
 			retval += args[t]->GenerateCode(ast);
@@ -1010,7 +1015,7 @@ std::string FuncDecl::GenerateMainFuncHLSL(Ast* ast)
 
 		// The user specified output varyings.
 		for(const auto& var : ast->stageOutputVaryings) {
-			retval += var.type.GetTypeAsString(ast->lang, true) + " " + var.varName + " : " + var.varName + ";";
+			retval += var.typeNode->GenerateTypeDesc().GetTypeAsString(ast->lang, true) + " " + var.varName + " : " + var.varName + ";";
 		}
 
 		// Stage specific output with SV_*.
@@ -1028,12 +1033,12 @@ std::string FuncDecl::GenerateMainFuncHLSL(Ast* ast)
 
 		// Vertex attributes input.
 		for(auto& attrib : ast->vertexAttribs) {
-			retval += attrib.type.ComposeVarDecl(ast->lang, attrib.varName) + " : " + attrib.semantic + ",";
+			retval += attrib.typeNode->GenerateTypeDesc().ComposeVarDecl(ast->lang, attrib.varName) + " : " + attrib.semantic + ",";
 		}
 
 		// Varyings input.
 		for(auto& var : ast->stageInputVaryings) {
-			retval += var.type.ComposeVarDecl(ast->lang, var.varName) + " : " + var.varName + ",";
+			retval += var.typeNode->GenerateTypeDesc().ComposeVarDecl(ast->lang, var.varName) + " : " + var.varName + ",";
 		}
 
 		// Stage specific input with SV_*.
@@ -1068,7 +1073,7 @@ void FuncDecl::Internal_Declare(Ast* ast)
 {
 	ast->declPushScope(name);
 
-	ast->declareFunction(retType, name);
+	ast->declareFunction(retType->GenerateTypeDesc(), name);
 
 	// Declare the local variables
 	for(auto& var : args) var->Declare(ast);
@@ -1181,27 +1186,27 @@ namespace XSR
 				// Vertex Attributes.
 				// [TODO] Concider to declare these values as locals in main.
 				for(const auto& var : ast.vertexAttribs) {
-					ast.declareVariable(var.type, var.varName, VarTrait_VertexAttribute);
+					ast.declareVariable(var.typeNode->GenerateTypeDesc(), var.varName, VarTrait_VertexAttribute);
 				}
 
 				// Input varyings. 
 				// [TODO] Concider to declare these values as locals in main.
 				for(const auto& var : ast.stageInputVaryings)
 				{
-					ast.declareVariable(var.type, var.varName, VarTrait_StageInVarying);
+					ast.declareVariable(var.typeNode->GenerateTypeDesc(), var.varName, VarTrait_StageInVarying);
 				}
 
 				// Output varyings.
 				// [TODO] Concider to declare these values as locals in main.
 				for(const auto& var : ast.stageOutputVaryings)
 				{
-					ast.declareVariable(var.type, var.varName, VarTrait_StageOutVarying);
+					ast.declareVariable(var.typeNode->GenerateTypeDesc(), var.varName, VarTrait_StageOutVarying);
 				}
 
 				// Declare the global unifroms.
 				for(const auto& unif : ast.uniforms)
 				{
-					ast.declareVariable(unif.type, unif.varName);
+					ast.declareVariable(unif.typeNode->GenerateTypeDesc(), unif.varName);
 				}
 			}
 
@@ -1223,29 +1228,29 @@ namespace XSR
 				// Keep in mind that in GLSL there are no sematics. So for vertex attributes
 				// we are going to output the semantic rater than the variable name.
 				for(const auto& var : ast.vertexAttribs) {
-					result += "attribute " + var.type.ComposeVarDecl(ast.lang, var.semantic) + ";";
+					result += "attribute " + var.typeNode->GenerateTypeDesc().ComposeVarDecl(ast.lang, var.semantic) + ";";
 				}
 
 				for(const auto& var : ast.stageInputVaryings) {
 					// [TODO] for older versions of GLSL this should be "vaying" instead of "in".
-					result += "in " + var.type.ComposeVarDecl(ast.lang, var.varName) + ";";
+					result += "in " + var.typeNode->GenerateTypeDesc().ComposeVarDecl(ast.lang, var.varName) + ";";
 				}
 
 				for(const auto& var : ast.stageOutputVaryings) {
 					// [TODO] for older versions of GLSL this should be "vaying" instead of out
-					result += "out " + var.type.ComposeVarDecl(ast.lang, var.varName) + ";";
+					result += "out " + var.typeNode->GenerateTypeDesc().ComposeVarDecl(ast.lang, var.varName) + ";";
 				}
 			}
 
 			// GENERATE the declaration code for uniforms for both GLSL and HLSL.
 			for(const auto& unif : ast.uniforms)
 			{
-				result += "uniform " + unif.type.ComposeVarDecl(ast.lang, unif.varName) + ";";
+				result += "uniform " + unif.typeNode->GenerateTypeDesc().ComposeVarDecl(ast.lang, unif.varName) + ";";
 
 				// Textures in HLSL need a sampler. Define 1 sampler for every texture.
 				if(ast.lang.outputLanguage == OL_HLSL) {
 					//[TODO] Arrays...
-					if(unif.type.GetBuiltInType() == Type_Texture2D) {
+					if(unif.typeNode->GenerateTypeDesc().GetBuiltInType() == Type_Texture2D) {
 						result += "uniform sampler " + unif.varName  + "_sgeSS;";
 					}
 				}
