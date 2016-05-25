@@ -3,6 +3,11 @@
 #include <algorithm>
 #include "ast.h"
 
+#ifndef _MSC_VER
+#define __FUNCTION__ __func__
+#endif
+
+
 namespace
 {
 	// HLSL shader result is returned as a structure from the main function.
@@ -18,7 +23,7 @@ namespace
 TypeDesc::TypeDesc(std::string strType, int arraySize)
 {
 	m_strType = strType;
-	m_arraySize = arraySize;
+	SetArraySize(0, arraySize);
 
 	if(strType == "void") m_type = Type_void;
 	else if(strType == "bool") m_type = Type_bool;
@@ -33,7 +38,7 @@ TypeDesc::TypeDesc(std::string strType, int arraySize)
 	else { m_type = Type_UserDefined; }
 }
 
-std::string TypeDesc::GetLangTypeName(const Type type)
+std::string TypeDesc::GetXShaderTypeName(const Type type)
 {
 	if(type == Type_void) return "void";
 	if(type == Type_bool) return "bool";
@@ -50,7 +55,7 @@ std::string TypeDesc::GetLangTypeName(const Type type)
 	if(type == Type_Texture2D) return "Texture2D";
 	if(type == Type_TextureCube) return "TextureCube";
 
-	throw ParseExcept("GetLangTypeName called with unknow argument");
+	throw ParseExcept(__FUNCTION__ " called with unknow argument!");
 }
 
 TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& member)
@@ -97,7 +102,7 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 	throw ParseExcept("Unknown member access: " + member);
 }
 
-std::string TypeDesc::GetTypeAsString(const LangSettings& lang, bool omitArraySize) const 
+std::string TypeDesc::GetTypeAsString(const LangSettings& lang, const bool omitArraySize) const 
 {
 	std::string retval;
 	if(GetBuiltInType() == Type_void) retval = "void";
@@ -108,7 +113,8 @@ std::string TypeDesc::GetTypeAsString(const LangSettings& lang, bool omitArraySi
 	else if(GetBuiltInType() == Type_vec3f) { if(lang.outputLanguage == OL_HLSL) retval = "float3"; else retval = "vec3"; }
 	else if(GetBuiltInType() == Type_vec4f) { if(lang.outputLanguage == OL_HLSL) retval = "float4"; else retval = "vec4"; }
 	else if(GetBuiltInType() == Type_mat4f) { if(lang.outputLanguage == OL_HLSL) retval = "float4x4"; else retval = "mat4"; }
-	else if(GetBuiltInType() == Type_Texture2D) { if(lang.outputLanguage == OL_HLSL) retval = "Texture2D"; else retval = "sampler2D"; } 
+	else if(GetBuiltInType() == Type_Texture2D) { if(lang.outputLanguage == OL_HLSL) retval = "Texture2D"; else retval = "sampler2D"; }
+	else if(GetBuiltInType() == Type_TextureCube) { if(lang.outputLanguage == OL_HLSL) retval = "TextureCube"; else retval = "samplerCube"; } 
 	else if(GetBuiltInType() == Type_UserDefined)
 	{
 		if(m_strType.empty()) retval = "<empty-str-type>";
@@ -117,10 +123,21 @@ std::string TypeDesc::GetTypeAsString(const LangSettings& lang, bool omitArraySi
 
 	if(omitArraySize == false)
 	{
-		char arraySizeStr[32];
-		sprintf(arraySizeStr, "[%d]", m_arraySize);
+		retval += GetArraySuffixString();
+	}
 
-		retval += arraySizeStr;
+	return retval;
+}
+
+std::string TypeDesc::GetArraySuffixString() const
+{
+	std::string retval;
+
+	for(int iLevel = 0; iLevel < GetArrayLevelsCount(); ++iLevel)
+	{
+		char temp[32] = {0};
+		sprintf(temp, "[%d]", GetArraySize(iLevel));
+		retval += temp;
 	}
 
 	return retval;
@@ -128,10 +145,11 @@ std::string TypeDesc::GetTypeAsString(const LangSettings& lang, bool omitArraySi
 
 std::string TypeDesc::ComposeVarDecl(const LangSettings& lang, const std::string& varName) const
 {
-	if (m_arraySize > 0)
+	if(IsArray())
 	{
-		char arraySuffix[32];
-		sprintf(arraySuffix, "[%d]", m_arraySize);
+		// In both HLSL and GLSL array are defined like this:
+		// type varname[sz0][sz1]..;
+		const std::string arraySuffix = GetArraySuffixString();
 		return GetTypeAsString(lang, true) + " " + varName + arraySuffix;
 	}
 
@@ -223,6 +241,22 @@ void Node::Declare(Ast* ast)
 	if(inBlock) ast->declPushScope();
 	Internal_Declare(ast);
 	if(inBlock) ast->declPopScope();
+}
+
+//-----------------------------------------------------------------------
+//
+//-----------------------------------------------------------------------
+TypeDesc TypeDeclNode::Internal_DeduceType(Ast* ast)
+{
+	if(resolvedType == Type_Undeduced) {
+		resolvedType = TypeDesc(typeAsString, 0);
+
+		for(int iElem=0; iElem < arraySizes.size(); iElem++){
+			resolvedType.SetArraySize(iElem, arraySizes[iElem]);
+		}
+	}
+
+	return resolvedType;
 }
 
 //-----------------------------------------------------------------------
@@ -364,11 +398,17 @@ void ExprBin::Internal_Declare(Ast* ast)
 TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 {
 	// Check if the type has been already resolved
-	if(resolvedType != Type_Undeduced) return resolvedType;
+	if(resolvedType != Type_Undeduced) {
+		return resolvedType;
+	}
 
 	// Resolve the arguments type.
 	const auto lt = left->DeduceType(ast);
 	const auto rt = right->DeduceType(ast);
+
+	if(lt.IsArray() || rt.IsArray()){
+		throw ParseExcept("Binary operations between arrays are not supported!");
+	}
 
 	// Just a helper function...
 	auto isPairOf = [lt, rt](Type a, Type b) {
@@ -383,7 +423,7 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 		case EBT_Sub :
 		{
 			if(lt != rt) 
-				throw ParseExcept("+/- operator called with mixed types: " + TypeDesc::GetLangTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetLangTypeName(rt.GetBuiltInType()));
+				throw ParseExcept("+/- operator called with mixed types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
 		
 			resolvedType = lt;
 			break;
@@ -398,11 +438,12 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 			else if(isPairOf(Type_float, Type_vec4f)) resolvedType = TypeDesc(Type_vec4f);
 			else if(isPairOf(Type_mat4f, Type_vec4f)) resolvedType = TypeDesc(Type_vec4f);
 			else if(isPairOf(Type_mat4f, Type_float)) resolvedType = TypeDesc(Type_mat4f);
+			else if(isPairOf(Type_mat4f, Type_mat4f)) resolvedType = TypeDesc(Type_mat4f);
 			else if(isPairOf(Type_mat4f, Type_int)) resolvedType = TypeDesc(Type_mat4f);
 			
 			// The type should be deduced by now, if not this is an error.
 			if(resolvedType == Type_Undeduced)
-				throw ParseExcept("* operator called with incompatible types: " + TypeDesc::GetLangTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetLangTypeName(rt.GetBuiltInType()));
+				throw ParseExcept("* operator called with incompatible types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
 		
 			break;
 		}
@@ -414,7 +455,7 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 
 			// The type should be deduced by now, if not this is an error.
 			if(resolvedType == Type_Undeduced)
-				throw ParseExcept("/ operator called with incompatible types: " + TypeDesc::GetLangTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetLangTypeName(rt.GetBuiltInType()));
+				throw ParseExcept("/ operator called with incompatible types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
 			break;
 		}
 		
@@ -458,10 +499,14 @@ TypeDesc ExprIndexing::Internal_DeduceType(Ast* ast)
 	if(resolvedType != Type_Undeduced) return resolvedType;
 
 	TypeDesc exprType = expr->DeduceType(ast);
-	if(exprType.IsArray() == false) throw ParseExcept("[] Indexing works only on arrays!");
+	if(exprType.IsArray() == false) {
+		throw ParseExcept("[] Indexing works only on arrays!");
+	}
 
+	// Shrink the type by one level.
 	resolvedType = exprType;
-	resolvedType.SetArraySize(0);
+	resolvedType.SetArraySize(resolvedType.GetArrayLevelsCount()-1, 0);
+
 	return resolvedType;
 }
 
@@ -476,29 +521,20 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 	{
 		if(args.size() != 2)
 		{
-			throw ParseExcept("takeSample called with wrong number of argumnets.");
+			throw ParseExcept("Invalid call to takeSample(<TextureType>, <samplingArgs>).");
 		}
 
-		const TypeDesc typeArg0 = args[0]->DeduceType(ast);
-		const TypeDesc typeArg1 = args[1]->DeduceType(ast);
+		// Get the given argument types and find out what call actually we have.
+		const TypeDesc textureType = args[0]->DeduceType(ast);
+		const TypeDesc samplingCoordType = args[1]->DeduceType(ast);
 
-		if(typeArg0 == Type_Texture2D)
+		if(textureType==Type_Texture2D && samplingCoordType!=Type_vec2f)
 		{
-			if(typeArg1 != Type_vec2f)
-			{
-				throw ParseExcept("Invalid call to takeSample(Texture2D texture, vec2f samplingUV).");
-			}
+			throw ParseExcept("Invalid call to takeSample(Texture2D texture, vec2f samplingUV).");
 		}
-		else if(typeArg0 == Type_TextureCube)
+		else if(textureType==Type_TextureCube && samplingCoordType!=Type_vec3f)
 		{
-			if(typeArg1 != Type_vec3f)
-			{
-				throw ParseExcept("Invalid call to takeSample(TextureCube texture, vec3f samplingNormal).");
-			}
-		}
-		else
-		{
-			throw ParseExcept("Invalid call to takeSample(<TextureType>, <samplingArgs>)");
+			throw ParseExcept("Invalid call to takeSample(TextureCube texture, vec3f samplingNormal).");
 		}
 
 		const std::string textureCode = args[0]->GenerateCode(ast);
@@ -512,7 +548,9 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 		}
 		else if(ast->OutLangIs(OL_GLSL))
 		{
-			return "texture2D(" + textureCode + "," + samplingPtCode + ")";
+			if(textureType == Type_Texture2D) return "texture2D(" + textureCode + "," + samplingPtCode + ")";
+			if(textureType == Type_TextureCube) return "textureCube(" + textureCode + "," + samplingPtCode + ")";
+			else throw ParseExcept("takeSample is not implemented for this type!");
 		}
 		else
 		{
@@ -533,7 +571,7 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 		// Check if this is a type constructor (vec3f(...) vec4f(...) ect...)
 		for(int t = Type_BuiltInTypeBegin + 1; t < Type_BuiltInTypeEnd; ++t)
 		{
-			const std::string typeName = TypeDesc::GetLangTypeName((Type)t);
+			const std::string typeName = TypeDesc::GetXShaderTypeName((Type)t);
 		
 			if(fnName == typeName) 
 			{
@@ -575,18 +613,17 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 {
 	if(resolvedType != Type_Undeduced) return resolvedType;
 
-	//[HARDCODED]
+	// [HARDCODED]
 	// Function calls type deduction has special behavior for some specific functions that is hardcoded here.
 	// The right thing to do is to support multiple function declaration(based on the argument types),
 	// but currently these functions are the only real cases(or at least known to me).
 	// linear interpolation support both hlsl "lerp" and glsl "mix".
 	if(	fnName == "lerp" || fnName == "mix" || fnName == "clamp")
 	{
-		if(args.size() != 3) throw ParseExcept("lerp called with wrong arg count(should be 3: x a,b)");
+		if(args.size() != 3) throw ParseExcept("lerp/mix/clamp called with wrong arg count(should be 3: x a,b)");
 
 		if(args[0]->DeduceType(ast) != args[1]->DeduceType(ast)) throw ParseExcept("lerp mixed arguments type");
 		if(args[2]->DeduceType(ast) != Type_float) throw ParseExcept("lerp interpolation coeff isn't  a float!"); // the interpolation coeff must be a float.
-		
 
 		resolvedType = args[1]->DeduceType(ast);
 	}
@@ -636,11 +673,17 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 		}
 	}
 
+	if(fnName == "transpose")
+	{
+		if(args.size() != 1) throw ParseExcept("transpose must be called with exactly one argument.");
+		resolvedType = args[0]->DeduceType(ast);
+	}
+
 	// Check if this is a type constructor.
 	if(resolvedType == Type_Undeduced)
 	for(int t = Type_BuiltInTypeBegin + 1; t < Type_BuiltInTypeEnd; ++t)
 	{
-		const std::string typeName = TypeDesc::GetLangTypeName((Type)t);
+		const std::string typeName = TypeDesc::GetXShaderTypeName((Type)t);
 		
 		if(fnName == typeName) 
 		{
@@ -714,7 +757,7 @@ TypeDesc ExprBlock::Internal_DeduceType(Ast* ast)
 			}
 		}
 
-		resolvedType.SetArraySize(exprs.size());
+		resolvedType.SetArraySize(resolvedType.GetArrayLevelsCount(), exprs.size());
 	}
 
 	return resolvedType;
@@ -912,6 +955,8 @@ std::string VarDecl::Internal_GenerateCode(Ast* ast)
 {
 	std::string retval;
 
+	const TypeDesc type = typeNode->DeduceType(ast);
+
 	if(type.IsArray() == false)
 	{
 		// Non-Arrays
@@ -927,13 +972,18 @@ std::string VarDecl::Internal_GenerateCode(Ast* ast)
 	else
 	{
 		// Arrays
-		char arraysSuffux[32] = { 0 };
-		sprintf(arraysSuffux, "[%d]", type.GetArraySize() );
+		std::string arraySizesString;
+		for(int iLevel = 0; iLevel < type.GetArrayLevelsCount(); ++iLevel) {
+			char temp[32] = { 0 };
+				sprintf(temp, "[%d]", type.GetArraySize(iLevel) );
+				arraySizesString += temp;
+		}
+
 		const std::string typeAsString = type.GetTypeAsString(ast->lang, true) + " ";
 
 		for(int t = 0; t < ident.size(); ++t)
 		{
-			retval += typeAsString + ident[t] + arraysSuffux;
+			retval += typeAsString + ident[t] + arraySizesString;
 			if(expr[t]) retval += "=" + expr[t]->GenerateCode(ast);
 			if(t < ident.size() - 1) retval += ';';
 		}
@@ -944,6 +994,8 @@ std::string VarDecl::Internal_GenerateCode(Ast* ast)
 
 void VarDecl::Internal_Declare(Ast* ast)
 {
+	const TypeDesc type = typeNode->DeduceType(ast);
+
 	for(int t = 0; t < ident.size(); ++t)
 	{
 		ast->declareVariable(type, ident[t]);
@@ -1108,7 +1160,7 @@ namespace XSR
 
 	bool XSCompileCode(
 		const char* const pCode, 
-		const LangSettings langSettings,
+		const LangSettings& langSettings,
 		std::string& result,
 		std::string& compilationErrors)
 	{
@@ -1245,7 +1297,8 @@ namespace XSR
 				// Textures in HLSL need a sampler. Define 1 sampler for every texture.
 				if(ast.lang.outputLanguage == OL_HLSL) {
 					//[TODO] Arrays...
-					if(unif.type.GetBuiltInType() == Type_Texture2D) {
+					if(unif.type.GetBuiltInType() == Type_Texture2D ||
+						 unif.type.GetBuiltInType() == Type_TextureCube) {
 						result += "uniform sampler " + unif.varName  + "_sgeSS;";
 					}
 				}

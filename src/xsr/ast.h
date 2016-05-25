@@ -5,6 +5,7 @@
 #include <list>
 #include <string>
 #include <exception>
+#include <cassert>
 
 #include "xsr.h"
 using namespace XSR;
@@ -50,6 +51,7 @@ enum Type
 	Type_UserDefined, // A user defined class.
 };
 
+// A so called trait attached to the variable.
 enum VarTrait
 {
 	VarTrait_Regular, // Just a regual variable.
@@ -67,33 +69,89 @@ struct TypeDesc
 {
 public :
 
-	static std::string GetLangTypeName(const Type type);
+	static std::string GetXShaderTypeName(const Type type);
 	
 public :
 
 	TypeDesc(Type type = Type_Undeduced, int arraySize = 0) : m_type(type), m_arraySize(arraySize) {}
 	explicit TypeDesc(std::string strType, int arraySize = 0);
 
-	bool IsArray() const { return m_arraySize > 0; }
-	int GetArraySize() const { return m_arraySize; }
-	void SetArraySize(int arraySize) { m_arraySize = arraySize; }
+	bool IsArray() const { return m_arraySize.size() != 0; }
+	
+	int GetArrayLevelsCount() const {
+		return m_arraySize.size();
+	}
 
-	bool operator==(const Type type) const { return type == m_type && (m_arraySize == 0); }
-	bool operator!=(const Type type) const { return type != m_type && (m_arraySize == 0); }
+	int GetArraySize(const int level) const {
+		if(level >= m_arraySize.size()) return 0;
+		return m_arraySize.at(level);
+	
+	}
+	void SetArraySize(const int level, const int arraySize) {
+		
+		// In order to simplify code generation ignore calls with level < 0.
+		if(level < 0){
+			return;
+		}
+
+		// Modifying exiting array size or adding a new one are the only valid operations.
+		// making float[4] to float[4][0][1] does not make any sense...
+		if(level > m_arraySize.size()) {
+			assert(false);
+		}
+
+		// Allocate enough space for the new level.
+		if(m_arraySize.size() <= level) {
+			m_arraySize.resize(level+1);
+		}
+
+		// if the array size is 0, that means that we should cut off that array size (all behind it).
+		// If does not make sense to have  float[0][2] does it.
+		// Addionally assert is if we are cutting something different form the last level.
+		// [TODO] a bit more error checking ???
+		if(arraySize == 0)
+		{
+			assert(m_arraySize.size() - 1 == level);
+			m_arraySize.erase(m_arraySize.begin()+level, m_arraySize.end());
+		}
+		else
+		{
+			m_arraySize[level] = arraySize;
+		}
+	}
+
+	bool operator==(const Type type) const { return type == m_type && (IsArray() == false); }
+	bool operator!=(const Type type) const { return !(*this == type); }
 
 	bool operator==(const TypeDesc& other) const {
 
 		// Check if both types are arrays or not.
-		const bool areSameArraywise = !!(GetArraySize()) ^ !!(other.GetArraySize());
-		if(areSameArraywise) return false;
+		if(GetArrayLevelsCount() != other.GetArrayLevelsCount()){
+			return false;
+		}
 
+		for(int iLevel = 0; iLevel < GetArrayLevelsCount(); ++iLevel){
+			if(GetArraySize(iLevel) != other.GetArraySize(iLevel)){
+				return false;
+			}
+		}
+		
 		// Check if the data type is the same.
 		if(m_type != Type_UserDefined) return m_type == other.m_type;
 		return m_strType == other.m_strType;
 	}
+
 	bool operator!=(const TypeDesc& other) const { return !(*this == other); }
+
+	// Returns the type of parent::member.
 	static TypeDesc GetMemberType(const TypeDesc& parent, const std::string& member);
-	std::string GetTypeAsString(const LangSettings& lang,  bool omitArraySize) const;
+	
+	// Returns 
+	std::string GetTypeAsString(const LangSettings& lang, const bool omitArraySize) const;
+	
+	// Returns the string that adds the array component of the type
+	std::string GetArraySuffixString() const;
+	
 	std::string ComposeVarDecl(const LangSettings& lang, const std::string& varName) const ;
 	
 	Type GetBuiltInType() const { return m_type; }
@@ -101,7 +159,8 @@ private :
 
 	Type m_type = Type_Undeduced;
 	std::string m_strType;
-	int m_arraySize = 0; // 0 means that this is not an array.
+	std::vector<int> m_arraySize;
+	//int m_arraySize = 0; // 0 means that this is not an array.
 };
 
 enum ExprBinType
@@ -286,6 +345,20 @@ struct Ast
 	// Cached output language settings.
 	LangSettings lang;
 	bool OutLangIs(OutputLanguage ol) const { return lang.outputLanguage == ol; }
+};
+
+//-------------------------------------------------------------------------
+//
+//-------------------------------------------------------------------------
+struct TypeDeclNode : public Node
+{
+	TypeDeclNode() = default;
+	TypeDesc Internal_DeduceType(Ast* ast) override;
+
+	std::string typeAsString;
+	std::vector<int> arraySizes;
+
+	TypeDesc resolvedType;
 };
 
 //-------------------------------------------------------------------------
@@ -491,8 +564,8 @@ struct VarDecl : public Node
 {
 	VarDecl() = default;
 
-	VarDecl(TypeDesc type, std::string firstIdent, Node* firstExpr) : 
-		type(type)
+	VarDecl(std::string firstIdent, Node* firstExpr) : 
+		typeNode(nullptr)
 	{
 		ident.push_back(firstIdent);
 		expr.push_back(firstExpr);
@@ -501,7 +574,7 @@ struct VarDecl : public Node
 	std::string Internal_GenerateCode(Ast* ast) override;
 	void Internal_Declare(Ast* ast) override;
 
-	TypeDesc type;//std::string type;
+	TypeDeclNode* typeNode;
 	std::vector<std::string> ident;
 	std::vector<Node*> expr;
 };

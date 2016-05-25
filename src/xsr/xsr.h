@@ -19,13 +19,19 @@ namespace XSR
 
 	struct LangSettings
 	{
+		LangSettings(){}
+		LangSettings(const OutputLanguage outputLanguage, const ShaderType shaderType) :
+			outputLanguage(outputLanguage),
+			shaderType(shaderType)
+		{}
+
 		OutputLanguage outputLanguage;
 		ShaderType shaderType;
 	};
 
 	bool XSCompileCode(
 		const char* const pCode, 
-		const LangSettings langSettings,
+		const LangSettings& langSettings,
 		std::string& result,
 		std::string& compilationErrors);
 }

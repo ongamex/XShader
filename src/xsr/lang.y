@@ -1,5 +1,6 @@
 %define api.pure full
 %locations
+%no-lines
 %error-verbose
 %lex-param {yyscan_t scanner}
 %parse-param {yyscan_t scanner}
@@ -59,6 +60,7 @@ bool parseExpression(const std::string& inp);
 %type <node>		program grammar_elem grammar_list
 %type <typeDesc> 	shader_gvar_type
 %type <node>		shader_globals // These actually have no type.
+%type <node>        type_node
 
 // The root.
 %start program
@@ -91,6 +93,13 @@ grammar_list :
 			$$ = $1;
 		}
 	;
+	
+	//-------------------------------------------------
+	// A genric type mentioning.
+	//-------------------------------------------------
+	type_node : 
+		 IDENT 				        { $$ = ast->push<TypeDeclNode>(); $$->As<TypeDeclNode>().typeAsString = $1; }
+		| type_node '[' NUM_INT ']' { $$ = $1; $$->As<TypeDeclNode>().arraySizes.push_back($3); }
 	
 	//-------------------------------------------------
 	// Global variables, uniforms, varyings, attributes
@@ -154,8 +163,8 @@ function_decl :
 	// A single variable(or a variable list followed by a single variable) and the optional assigment expression
 	// type var, var = expr;
 vardecl_var_list : 
-		IDENT 								{ $$ = ast->push<VarDecl>(TypeDesc(), $1, nullptr); }
-	|	IDENT '=' expr 						{ $$ = ast->push<VarDecl>(TypeDesc(), $1, $3); }
+		IDENT 								{ $$ = ast->push<VarDecl>($1, nullptr); }
+	|	IDENT '=' expr 						{ $$ = ast->push<VarDecl>($1, $3); }
 	|	vardecl_var_list ',' IDENT 			{ 
 			$1->As<VarDecl>().ident.push_back($3);
 			$1->As<VarDecl>().expr.push_back(nullptr);
@@ -169,8 +178,7 @@ vardecl_var_list :
 	
 	// The actual variable declaration
 vardecl :
-			IDENT vardecl_var_list	{ $2->As<VarDecl>().type = TypeDesc($1); $$ = $2; }
-		|	IDENT '[' NUM_INT ']' vardecl_var_list { $5->As<VarDecl>().type = TypeDesc($1, $3); $$ = $5; }
+			type_node vardecl_var_list	{ $2->As<VarDecl>().typeNode = static_cast<TypeDeclNode*>($1); $$ = $2; }
 	;
 	
 	//-------------------------------------------------
