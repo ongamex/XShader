@@ -12,13 +12,13 @@ using namespace XSR;
 
 struct Ast;
 
-struct ParseExcept : public std::exception {
+struct ParseExcept : public std::logic_error {
 	ParseExcept(const char* msg) :
-		std::exception(msg)
+		std::logic_error(msg)
 	{}
 
 	ParseExcept(const std::string& msg) :
-		std::exception(msg.c_str())
+		std::logic_error(msg.c_str())
 	{}
 };
 
