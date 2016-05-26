@@ -3,11 +3,6 @@
 #include <algorithm>
 #include "ast.h"
 
-#ifndef _MSC_VER
-#define __FUNCTION__ __func__
-#endif
-
-
 namespace
 {
 	// HLSL shader result is returned as a structure from the main function.
@@ -55,7 +50,7 @@ std::string TypeDesc::GetXShaderTypeName(const Type type)
 	if(type == Type_Texture2D) return "Texture2D";
 	if(type == Type_TextureCube) return "TextureCube";
 
-	throw ParseExcept(__FUNCTION__ " called with unknow argument!");
+	throw ParseExcept("GetXShaderTypeName called with unknow argument!");
 }
 
 TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& member)
