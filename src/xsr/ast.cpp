@@ -3,6 +3,9 @@
 #include <algorithm>
 #include "ast.h"
 
+#include <stdarg.h>  // For va_start, etc.
+#include <memory>    // For std::unique_ptr
+
 namespace
 {
 	// HLSL shader result is returned as a structure from the main function.
@@ -50,7 +53,7 @@ std::string TypeDesc::GetXShaderTypeName(const Type type)
 	if(type == Type_Texture2D) return "Texture2D";
 	if(type == Type_TextureCube) return "TextureCube";
 
-	throw ParseExcept("GetXShaderTypeName called with unknow argument!");
+	throw ParseExcept(NodeLocation(), "GetXShaderTypeName called with unknow argument!");
 }
 
 TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& member)
@@ -73,7 +76,7 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 		{
 			for(auto ch : member) {
 				if(ch != 'x' && ch != 'y' && ch != 'z' && ch != 'w') {
-					throw ParseExcept("Trying to reference unexisting member: " + member);
+					throw ParseExcept(NodeLocation(), "Trying to reference unexisting member: " + member);
 				}
 			}
 
@@ -94,7 +97,7 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 		}
 	}
 
-	throw ParseExcept("Unknown member access: " + member);
+	throw ParseExcept(NodeLocation(), "Unknown member access: " + member);
 }
 
 std::string TypeDesc::GetTypeAsString(const LangSettings& lang, const bool omitArraySize) const 
@@ -165,9 +168,10 @@ const Ast::FullVariableDesc* Ast::declareVariable(const TypeDesc& td, const std:
 	fvd.trait = trait;
 
 	// Proove that there isn't a variable with the same name already defined.
-	std::find_if(begin(declaredVariables), end(declaredVariables), [&fvd, &name](FullVariableDesc v) {
+	std::find_if(begin(declaredVariables), end(declaredVariables), [&fvd, &name](FullVariableDesc v)
+	{
 		const bool equal = fvd.fullName == v.fullName;
-		if(equal) throw ParseExcept("Variable with name '" + name + "' is already defined!");
+		if(equal) throw ParseExcept(NodeLocation(), "Variable with name '" + name + "' is already defined!");
 		return equal;
 	});
 
@@ -210,7 +214,7 @@ const Ast::FullVariableDesc* Ast::findVarInCurrentScope(const std::string& name)
 		depth--;
 	}
 
-	throw ParseExcept("Referenced an undefined variable: " + name);
+	throw ParseExcept(NodeLocation(), "Referenced an undefined variable: " + name);
 }
 
 const Ast::FullFuncionDesc& Ast::findFuncDecl(const std::string& name)
@@ -220,7 +224,7 @@ const Ast::FullFuncionDesc& Ast::findFuncDecl(const std::string& name)
 		if(f.fullName == name) return f;
 	}
 
-	throw ParseExcept("Referenced an undefined funcion: " + name);
+	throw ParseExcept(NodeLocation(), "Referenced an undefined funcion: " + name);
 }
 
 void Ast::declareFunction(const TypeDesc& returnType, const std::string& name)
@@ -295,7 +299,7 @@ std::string Ident::Internal_GenerateCode(Ast* ast)
 				if(attr.varName == identifier) return attr.semantic;
 			}
 
-			throw ParseExcept("Attribute '" + identifier + "\' not found!");
+			throw ParseExcept(location, "Attribute '" + identifier + "\' not found!");
 		}
 	}
 
@@ -381,7 +385,7 @@ std::string ExprBin::Internal_GenerateCode(Ast* ast)
 		case EBT_And :      return left->GenerateCode(ast) + (" && ") + right->GenerateCode(ast);         
 	}
 
-	throw ParseExcept("Unknown bynary opt!");
+	throw ParseExcept(location, "Unknown bynary opt!");
 }
 
 void ExprBin::Internal_Declare(Ast* ast)
@@ -402,7 +406,7 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 	const auto rt = right->DeduceType(ast);
 
 	if(lt.IsArray() || rt.IsArray()){
-		throw ParseExcept("Binary operations between arrays are not supported!");
+		throw ParseExcept(location, "Binary operations between arrays are not supported!");
 	}
 
 	// Just a helper function...
@@ -418,7 +422,7 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 		case EBT_Sub :
 		{
 			if(lt != rt) 
-				throw ParseExcept("+/- operator called with mixed types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
+				throw ParseExcept(location, "+/- operator called with mixed types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
 		
 			resolvedType = lt;
 			break;
@@ -438,7 +442,7 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 			
 			// The type should be deduced by now, if not this is an error.
 			if(resolvedType == Type_Undeduced)
-				throw ParseExcept("* operator called with incompatible types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
+				throw ParseExcept(location, "* operator called with incompatible types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
 		
 			break;
 		}
@@ -450,7 +454,7 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 
 			// The type should be deduced by now, if not this is an error.
 			if(resolvedType == Type_Undeduced)
-				throw ParseExcept("/ operator called with incompatible types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
+				throw ParseExcept(location, "/ operator called with incompatible types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
 			break;
 		}
 		
@@ -468,7 +472,7 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 			break;
 		}
 		default :
-			throw ParseExcept("Unknown binary expression type!");
+			throw ParseExcept(location, "Unknown binary expression type!");
 	}
 
 	if(resolvedType == Type_Undeduced) throw("ExprBin type deduction failed");
@@ -495,7 +499,7 @@ TypeDesc ExprIndexing::Internal_DeduceType(Ast* ast)
 
 	TypeDesc exprType = expr->DeduceType(ast);
 	if(exprType.IsArray() == false) {
-		throw ParseExcept("[] Indexing works only on arrays!");
+		throw ParseExcept(location, "[] Indexing works only on arrays!");
 	}
 
 	// Shrink the type by one level.
@@ -516,7 +520,7 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 	{
 		if(args.size() != 2)
 		{
-			throw ParseExcept("Invalid call to takeSample(<TextureType>, <samplingArgs>).");
+			throw ParseExcept(location, "Invalid call to takeSample(<TextureType>, <samplingArgs>).");
 		}
 
 		// Get the given argument types and find out what call actually we have.
@@ -525,11 +529,11 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 
 		if(textureType==Type_Texture2D && samplingCoordType!=Type_vec2f)
 		{
-			throw ParseExcept("Invalid call to takeSample(Texture2D texture, vec2f samplingUV).");
+			throw ParseExcept(location, "Invalid call to takeSample(Texture2D texture, vec2f samplingUV).");
 		}
 		else if(textureType==Type_TextureCube && samplingCoordType!=Type_vec3f)
 		{
-			throw ParseExcept("Invalid call to takeSample(TextureCube texture, vec3f samplingNormal).");
+			throw ParseExcept(location, "Invalid call to takeSample(TextureCube texture, vec3f samplingNormal).");
 		}
 
 		const std::string textureCode = args[0]->GenerateCode(ast);
@@ -545,11 +549,11 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 		{
 			if(textureType == Type_Texture2D) return "texture2D(" + textureCode + "," + samplingPtCode + ")";
 			if(textureType == Type_TextureCube) return "textureCube(" + textureCode + "," + samplingPtCode + ")";
-			else throw ParseExcept("takeSample is not implemented for this type!");
+			else throw ParseExcept(location, "takeSample is not implemented for this type!");
 		}
 		else
 		{
-			throw ParseExcept("Unvalid code path in FuncCall::Internal_GenerateCode.");
+			throw ParseExcept(location, "Unvalid code path in FuncCall::Internal_GenerateCode.");
 		}
 	}
 	
@@ -613,24 +617,24 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 	// The right thing to do is to support multiple function declaration(based on the argument types),
 	// but currently these functions are the only real cases(or at least known to me).
 	// linear interpolation support both hlsl "lerp" and glsl "mix".
-	if(	fnName == "lerp" || fnName == "mix" || fnName == "clamp")
+	if(fnName == "lerp" || fnName == "mix" || fnName == "clamp" || fnName == "smoothstep")
 	{
-		if(args.size() != 3) throw ParseExcept("lerp/mix/clamp called with wrong arg count(should be 3: x a,b)");
+		if(args.size() != 3) throw ParseExcept(location, "lerp/mix/clamp called with wrong arg count(should be 3: x a,b)");
 
-		if(args[0]->DeduceType(ast) != args[1]->DeduceType(ast)) throw ParseExcept("lerp mixed arguments type");
-		if(args[2]->DeduceType(ast) != Type_float) throw ParseExcept("lerp interpolation coeff isn't  a float!"); // the interpolation coeff must be a float.
+		if(args[0]->DeduceType(ast) != args[1]->DeduceType(ast)) throw ParseExcept(location, "lerp mixed arguments type");
+		if(args[2]->DeduceType(ast) != Type_float) throw ParseExcept(location, "lerp interpolation coeff isn't a float!"); // the interpolation coeff must be a float.
 
 		resolvedType = args[1]->DeduceType(ast);
 	}
 
 	if(fnName == "dot")
 	{
-		if(args.size() != 2) throw ParseExcept("dot must be called with exactly one argument.");
+		if(args.size() != 2) throw ParseExcept(location, "dot must be called with exactly one argument.");
 
 		const TypeDesc& td0 = args[0]->DeduceType(ast);
 		const TypeDesc& td1 = args[1]->DeduceType(ast);
 
-		if(td0 != td1) throw ParseExcept("dot called with mixed arguments."); 
+		if(td0 != td1) throw ParseExcept(location, "dot called with mixed arguments."); 
 
 		if(td0 == Type_vec2f || td0 == Type_vec3f || td0 == Type_vec4f)
 		{
@@ -638,7 +642,7 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 		}
 		else
 		{
-			throw ParseExcept("dot called with unknown argument type");
+			throw ParseExcept(location, "dot called with unknown argument type");
 		}
 	}
 
@@ -647,15 +651,15 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 		const TypeDesc& td0 = args[0]->DeduceType(ast);
 		const TypeDesc& td1 = args[1]->DeduceType(ast);
 
-		if(td0 != Type_vec3f) throw ParseExcept("cross is avaiabled only for vec3f class."); 
-		if(td0 != td1) throw ParseExcept("cross called with mixed arguments."); 
+		if(td0 != Type_vec3f) throw ParseExcept(location, "cross is avaiabled only for vec3f class."); 
+		if(td0 != td1) throw ParseExcept(location, "cross called with mixed arguments."); 
 
 		resolvedType = Type_vec3f;
 	}
 
 	if(fnName == "normalize")
 	{
-		if(args.size() != 1) throw ParseExcept("normalize must be called with exactly one argument.");
+		if(args.size() != 1) throw ParseExcept(location, "normalize must be called with exactly one argument.");
 
 		const TypeDesc& td = args[0]->DeduceType(ast);
 		if(td == Type_vec2f || td == Type_vec3f || td == Type_vec4f)
@@ -664,13 +668,13 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 		}
 		else
 		{
-			throw ParseExcept("normalize isnt't defined for this type!");
+			throw ParseExcept(location, "normalize isnt't defined for this type!");
 		}
 	}
 
 	if(fnName == "transpose")
 	{
-		if(args.size() != 1) throw ParseExcept("transpose must be called with exactly one argument.");
+		if(args.size() != 1) throw ParseExcept(location, "transpose must be called with exactly one argument.");
 		resolvedType = args[0]->DeduceType(ast);
 	}
 
@@ -723,7 +727,7 @@ std::string ExprLiteral::Internal_GenerateCode(Ast* ast)
 		return buff;
 	}
 
-	throw ParseExcept("Unknown literal type");
+	throw ParseExcept(location, "Unknown literal type");
 }
 
 TypeDesc ExprLiteral::Internal_DeduceType(Ast* ast) 
@@ -739,7 +743,7 @@ TypeDesc ExprBlock::Internal_DeduceType(Ast* ast)
 	if(resolvedType == Type_Undeduced)
 	{
 		if(exprs.size() == 0) {
-			throw ParseExcept("Invalid ExprBlock. No expressions are specified");
+			throw ParseExcept(location, "Invalid ExprBlock. No expressions are specified");
 		}
 
 		// All types should match, otherwise this block is invalid.
@@ -748,7 +752,7 @@ TypeDesc ExprBlock::Internal_DeduceType(Ast* ast)
 		{
 			if(resolvedType != exprs[t]->DeduceType(ast))
 			{
-				throw ParseExcept("Mixed types in ExprBlock");
+				throw ParseExcept(location, "Mixed types in ExprBlock");
 			}
 		}
 
@@ -793,7 +797,7 @@ std::string ExprBlock::Internal_GenerateCode(Ast* ast)
 	}
 	else
 	{
-		throw ParseExcept("Unknown output language!");
+		throw ParseExcept(location, "Unknown output language!");
 	}
 
 	return "{not-implemented}";
@@ -1172,7 +1176,7 @@ namespace XSR
 			XSParseExpression(processedCode.c_str(), &ast); // Build the AST tree.
 
 			if(!ast.program) {
-				throw ParseExcept(ast.bisonParseError.empty() ? "Failed while compiling program!" : ast.bisonParseError);
+				throw ParseExcept(NodeLocation(), ast.bisonParseError.empty() ? "Failed while compiling program!" : ast.bisonParseError);
 			}
 
 			// Declare the predefined functions for the language.
@@ -1304,7 +1308,16 @@ namespace XSR
 			return true;
 		}
 		catch(const ParseExcept& e) {
-			compilationErrors += std::string("[XSR] ") + e.what();
+			if(e.errorLoc.isValid())
+			{
+				char errorString[1024] = {0};
+				sprintf(errorString, "\n[XSR] error: @(%d) %s", e.errorLoc.line, e.what());
+				compilationErrors += errorString;
+			}
+			else
+			{
+				compilationErrors += std::string("\n[XSR] error: ") + e.what();
+			}
 			return false;
 		}
 

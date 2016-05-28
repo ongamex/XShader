@@ -38,7 +38,7 @@
 "native_code"											return NATIVE_CODE;
 "return"												return RETURN;
 [A-Za-z_][A-Za-z_0-9]* 									{ yylval->str_val = std::string(yytext); return IDENT; }
-[0-9][0-9]*(\.[0-9]+)([eE][0-9][0-9]*)?					{ yylval->float_val = atof(yytext); return NUM_FLOAT; }
+[0-9]*"."[0-9]+([eE][0-9][0-9]*)?f?						{ yylval->float_val = atof(yytext); return NUM_FLOAT; }
 [0-9][0-9]*												{ yylval->int_val = atoi(yytext); return NUM_INT; }
 "&&"													return AND;
 "||"													return OR;

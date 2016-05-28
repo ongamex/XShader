@@ -12,14 +12,32 @@ using namespace XSR;
 
 struct Ast;
 
-struct ParseExcept : public std::logic_error {
-	ParseExcept(const char* msg) :
-		std::logic_error(msg)
+struct NodeLocation
+{
+	NodeLocation() :
+		line(-1), column(-1)
 	{}
 
-	ParseExcept(const std::string& msg) :
-		std::logic_error(msg.c_str())
+	bool isValid() const {
+		return line != -1 && column != -1;
+	}
+
+	int line;
+	int column;
+};
+
+struct ParseExcept : public std::logic_error {
+	ParseExcept(const NodeLocation& errorLoc, const char* msg) :
+		std::logic_error(msg), 
+		errorLoc(errorLoc)
 	{}
+
+	ParseExcept(const NodeLocation& errorLoc, const std::string& msg) :
+		std::logic_error(msg.c_str()), 
+		errorLoc(errorLoc)
+	{}
+
+	NodeLocation errorLoc;
 };
 
 enum Type
@@ -205,6 +223,7 @@ struct Uniforms
 	std::string varName;
 };
 
+
 struct Node
 {
 public : 
@@ -242,6 +261,7 @@ public :
 	bool inParens = false; // True if the expression is surrounded with parens.
 	bool inBlock = false; // True if the statement is surrounded by { }
 	bool hasSemicolon = false; // True if the statement is of kind <--->; 
+	NodeLocation location;
 };
 
 struct Ast
@@ -254,8 +274,9 @@ struct Ast
 	}
 
 	template<typename T, typename... Args>
-	T* push(Args... args) {
+	T* push(const NodeLocation location, Args... args) {
 		T* node = new T(args...);
+		node->location = location;
 		nodes.push_back(node);
 		return node;
 	}

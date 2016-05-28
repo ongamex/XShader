@@ -22,6 +22,14 @@ void yyerror (YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
 
 bool parseExpression(const std::string& inp);
 
+// add a convert operator from YYLTYPE to NodeLocation
+NodeLocation toNodeLocation(const YYLTYPE& yyl) {
+	NodeLocation retval;
+	retval.line = yyl.first_line;
+	retval.column = yyl.first_column;
+	return retval;
+}
+
 %}
 
 // Token declaration.
@@ -79,7 +87,7 @@ grammar_list :
 		grammar_elem  				
 		{ 
 			// Create a list of program elements(only functions so far).
-			$$ = ast->push<ProgramElem>(); 
+			$$ = ast->push<ProgramElem>(toNodeLocation(@1)); 
 			
 			// A program element is not necessary a node. 
 			// For example vertexAttribs/varyings/uniforms they just do a add themselves
@@ -98,7 +106,7 @@ grammar_list :
 	// A genric type mentioning.
 	//-------------------------------------------------
 	type_node : 
-		 IDENT 				        { $$ = ast->push<TypeDeclNode>(); $$->As<TypeDeclNode>().typeAsString = $1; }
+		 IDENT 				        { $$ = ast->push<TypeDeclNode>(toNodeLocation(@1)); $$->As<TypeDeclNode>().typeAsString = $1; }
 		| type_node '[' NUM_INT ']' { $$ = $1; $$->As<TypeDeclNode>().arraySizes.push_back($3); }
 	
 	//-------------------------------------------------
@@ -123,14 +131,14 @@ shader_globals :
 	
 	// A single variable for function declarations.
 fndecl_vardecl_var : 
-		IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($1), $2, nullptr, FNAT_In   ); }
-	|	IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($1), $2, $4     , FNAT_In   ); }
-	|	IN IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, nullptr, FNAT_In	); }
-	|	IN IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, $5     , FNAT_In	); }
-	|	OUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, nullptr, FNAT_Out  ); }
-	|	OUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, $5     , FNAT_Out  ); }
-	|	INOUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, nullptr, FNAT_InOut); }
-	|	INOUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(TypeDesc($2), $3, $5     , FNAT_InOut); }
+		IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(toNodeLocation(@1), TypeDesc($1), $2, nullptr, FNAT_In   ); }
+	|	IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(toNodeLocation(@1), TypeDesc($1), $2, $4     , FNAT_In   ); }
+	|	IN IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(toNodeLocation(@1), TypeDesc($2), $3, nullptr, FNAT_In	); }
+	|	IN IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(toNodeLocation(@1), TypeDesc($2), $3, $5     , FNAT_In	); }
+	|	OUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(toNodeLocation(@1), TypeDesc($2), $3, nullptr, FNAT_Out  ); }
+	|	OUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(toNodeLocation(@1), TypeDesc($2), $3, $5     , FNAT_Out  ); }
+	|	INOUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(toNodeLocation(@1), TypeDesc($2), $3, nullptr, FNAT_InOut); }
+	|	INOUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(toNodeLocation(@1), TypeDesc($2), $3, $5     , FNAT_InOut); }
 	;
 	
 	// A list of variables for the function declaration.
@@ -138,8 +146,8 @@ fndecl_vardecl_var :
 	// Basically this create the function declaration node.
 	// the node is later finished by function_decl rule.
 fndecl_vardecl : 
-												{ $$ = ast->push<FuncDecl>(); }
-	|	fndecl_vardecl_var						{ $$ = ast->push<FuncDecl>(); ((FuncDecl*)$$)->args.push_back($1); }
+												{ $$ = ast->push<FuncDecl>(NodeLocation()); }
+	|	fndecl_vardecl_var						{ $$ = ast->push<FuncDecl>(toNodeLocation(@1)); ((FuncDecl*)$$)->args.push_back($1); }
 	|	fndecl_vardecl ',' fndecl_vardecl_var	{ $1->As<FuncDecl>().args.push_back($3); $$ = $1; }
 
 	
@@ -163,8 +171,8 @@ function_decl :
 	// A single variable(or a variable list followed by a single variable) and the optional assigment expression
 	// type var, var = expr;
 vardecl_var_list : 
-		IDENT 								{ $$ = ast->push<VarDecl>($1, nullptr); }
-	|	IDENT '=' expr 						{ $$ = ast->push<VarDecl>($1, $3); }
+		IDENT 								{ $$ = ast->push<VarDecl>(toNodeLocation(@1), $1, nullptr); }
+	|	IDENT '=' expr 						{ $$ = ast->push<VarDecl>(toNodeLocation(@1), $1, $3); }
 	|	vardecl_var_list ',' IDENT 			{ 
 			$1->As<VarDecl>().ident.push_back($3);
 			$1->As<VarDecl>().expr.push_back(nullptr);
@@ -189,24 +197,24 @@ stmt :
 		vardecl ';'									{ $1->hasSemicolon = true; ; $$ = $1; }
 	|	expr ';' 									{ $1->hasSemicolon = true; $$ = $1; }
 	|	assign_stmt ';' 							{ $1->hasSemicolon = true; $$ = $1; }
-	|	FOR '(' vardecl ';' expr ';' expr ')' stmt	{ $$ = ast->push<StmtFor>($3, $5, $7, $9); }
-	|	WHILE '(' expr ')' stmt 					{ $$ = ast->push<StmtWhile>($3, $5); }
-	|	IF '(' expr ')' stmt %prec NONASSOC_IF		{ $$ = ast->push<StmtIf>($3, $5, nullptr); }
-	|	IF '(' expr ')' stmt ELSE stmt				{ $$ = ast->push<StmtIf>($3, $5, $7); }
+	|	FOR '(' vardecl ';' expr ';' expr ')' stmt	{ $$ = ast->push<StmtFor>(toNodeLocation(@1), $3, $5, $7, $9); }
+	|	WHILE '(' expr ')' stmt 					{ $$ = ast->push<StmtWhile>(toNodeLocation(@1),$3, $5); }
+	|	IF '(' expr ')' stmt %prec NONASSOC_IF		{ $$ = ast->push<StmtIf>(toNodeLocation(@1), $3, $5, nullptr); }
+	|	IF '(' expr ')' stmt ELSE stmt				{ $$ = ast->push<StmtIf>(toNodeLocation(@1), $3, $5, $7); }
 	|	'{' stmt_list '}' 							{ $2->inBlock = true; $$ = $2; }
-	|	NATIVE_CODE '('  CODE_STRING  ')' ';'		{ $$ = ast->push<StmtNativeCode>($3); }
-	|	RETURN expr ';'								{ $$ = ast->push<StmtReturn>($2); }
-	|	RETURN ';'									{ $$ = ast->push<StmtReturn>(); }
+	|	NATIVE_CODE '('  CODE_STRING  ')' ';'		{ $$ = ast->push<StmtNativeCode>(toNodeLocation(@1), $3); }
+	|	RETURN expr ';'								{ $$ = ast->push<StmtReturn>(toNodeLocation(@1), $2); }
+	|	RETURN ';'									{ $$ = ast->push<StmtReturn>(toNodeLocation(@1)); }
 	;
 
 		//[TODO] This should become something like expr = expr at least because of array indexing.
 assign_stmt : 
-		expr '=' expr				{ $$ = ast->push<Assign>($1, $3); }
+		expr '=' expr				{ $$ = ast->push<Assign>(toNodeLocation(@1), $1, $3); }
 	;
 	
 	// A list of statements.
 stmt_list : 
-		stmt 				{ $$ = ast->push<StmtList>(); $$->As<StmtList>().nodes.push_back($1); }
+		stmt 				{ $$ = ast->push<StmtList>(toNodeLocation(@1)); $$->As<StmtList>().nodes.push_back($1); }
 	|	stmt_list stmt 		{ 
 			$$ = $1;
 			$1->As<StmtList>().nodes.push_back( {$2} );
@@ -220,23 +228,23 @@ stmt_list :
 expr : expr_base { $$ = $1; ast->addDeduct($1); }
 expr_base :
 		'(' expr_base ')'			    	{ $2->inParens = true; $$ = $2; }
-	|	expr_base '[' expr_base ']'			{ $$ = ast->push<ExprIndexing>($1, $3); } // shift-reduce don't know why...
-	|	expr_base '.' IDENT					{ $$ = ast->push<ExprMemberAccess>($1, $3); }
-	|	IDENT					        	{ $$ = ast->push<Ident>($1); }
-	|	expr_base OR expr_base			    { $$ = ast->push<ExprBin>(EBT_Or, $1, $3); }
-	|	expr_base AND expr_base			    { $$ = ast->push<ExprBin>(EBT_And, $1, $3); }
-	|	expr_base NOTEQUALS expr_base		{ $$ = ast->push<ExprBin>(EBT_NEquals, $1, $3); }
-	|	expr_base EQUALS expr_base			{ $$ = ast->push<ExprBin>(EBT_Equals, $1, $3); }
-	|	expr_base LE expr_base				{ $$ = ast->push<ExprBin>(EBT_LEquals, $1, $3); }
-	|	expr_base '<' expr_base				{ $$ = ast->push<ExprBin>(EBT_Less, $1, $3); }
-	|	expr_base GE expr_base				{ $$ = ast->push<ExprBin>(EBT_GEquals, $1, $3); }
-	|	expr_base '>' expr_base				{ $$ = ast->push<ExprBin>(EBT_Greater, $1, $3); }
-	|	expr_base '+' expr_base				{ $$ = ast->push<ExprBin>(EBT_Add, $1, $3); } 
-	|	expr_base '-' expr_base				{ $$ = ast->push<ExprBin>(EBT_Sub, $1, $3); } 	
-	|	expr_base '*' expr_base				{ $$ = ast->push<ExprBin>(EBT_Mul, $1, $3); } 
-	|	expr_base '/' expr_base				{ $$ = ast->push<ExprBin>(EBT_Div, $1, $3); }
-	|	NUM_FLOAT					        { $$ = ast->push<ExprLiteral>($1); }
-	|	NUM_INT						        { $$ = ast->push<ExprLiteral>($1); }
+	|	expr_base '[' expr_base ']'			{ $$ = ast->push<ExprIndexing>(toNodeLocation(@1), $1, $3); } // shift-reduce don't know why...
+	|	expr_base '.' IDENT					{ $$ = ast->push<ExprMemberAccess>(toNodeLocation(@1), $1, $3); }
+	|	IDENT					        	{ $$ = ast->push<Ident>(toNodeLocation(@1), $1); }
+	|	expr_base OR expr_base			    { $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_Or, $1, $3); }
+	|	expr_base AND expr_base			    { $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_And, $1, $3); }
+	|	expr_base NOTEQUALS expr_base		{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_NEquals, $1, $3); }
+	|	expr_base EQUALS expr_base			{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_Equals, $1, $3); }
+	|	expr_base LE expr_base				{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_LEquals, $1, $3); }
+	|	expr_base '<' expr_base				{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_Less, $1, $3); }
+	|	expr_base GE expr_base				{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_GEquals, $1, $3); }
+	|	expr_base '>' expr_base				{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_Greater, $1, $3); }
+	|	expr_base '+' expr_base				{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_Add, $1, $3); } 
+	|	expr_base '-' expr_base				{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_Sub, $1, $3); } 	
+	|	expr_base '*' expr_base				{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_Mul, $1, $3); } 
+	|	expr_base '/' expr_base				{ $$ = ast->push<ExprBin>(toNodeLocation(@1), EBT_Div, $1, $3); }
+	|	NUM_FLOAT					        { $$ = ast->push<ExprLiteral>(toNodeLocation(@1), $1); }
+	|	NUM_INT						        { $$ = ast->push<ExprLiteral>(toNodeLocation(@1), $1); }
 	|	expr_fncall					        { $$ = $1; }
 	|	expr_block							{ $$ = $1; }
 	|	'-' expr_base %prec NONASSOC_UNARY	{ $2->exprSign *= -1; $$ = $2; }
@@ -245,7 +253,7 @@ expr_base :
 
 	// Expression block. Something like "{expr, expr ...}" example array initialization.
 expr_block_expressions : 
-		expr_base				{ $$ = ast->push<ExprBlock>(); $$->As<ExprBlock>().exprs.push_back($1); }
+		expr_base				{ $$ = ast->push<ExprBlock>(toNodeLocation(@1)); $$->As<ExprBlock>().exprs.push_back($1); }
 	|	expr_block_expressions ',' expr_base	{ $1->As<ExprBlock>().exprs.push_back($3); $$ = $1; } 
 	;
 	
@@ -255,9 +263,9 @@ expr_block :
 
 	// Function arguments as a list.
 fncall_args :
-			{ $$ = ast->push<FuncCall>(); }
+			{ $$ = ast->push<FuncCall>(NodeLocation()); }
 	| 	expr_base { 
-					Node* fnCall = ast->push<FuncCall>();
+					Node* fnCall = ast->push<FuncCall>(toNodeLocation(@1));
 					fnCall->As<FuncCall>().args.push_back($1); 
 					$$ = fnCall;
 				  }

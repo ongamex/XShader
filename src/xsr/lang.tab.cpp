@@ -79,6 +79,14 @@ void yyerror (YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
 
 bool parseExpression(const std::string& inp);
 
+// add a convert operator from YYLTYPE to NodeLocation
+NodeLocation toNodeLocation(const YYLTYPE& yyl) {
+	NodeLocation retval;
+	retval.line = yyl.first_line;
+	retval.column = yyl.first_column;
+	return retval;
+}
+
 
 
 
@@ -462,7 +470,7 @@ static const yytype_uint8 yytranslate[] =
 static const yytype_uint16 yyprhs[] =
 {
        0,     0,     3,     5,     7,     9,    11,    14,    16,    21,
-      28,    33,    38,    43,    45,    50,    53,    58,    62,    68,
+      23,    28,    35,    40,    45,    50,    53,    58,    62,    68,
       72,    78,    82,    88,    89,    91,    95,   104,   106,   110,
      114,   120,   123,   126,   129,   132,   142,   148,   154,   162,
      166,   172,   176,   179,   183,   185,   188,   190,   194,   199,
@@ -474,11 +482,11 @@ static const yytype_uint16 yyprhs[] =
 /* YYRHS -- A `-1'-separated list of the rules' RHS.  */
 static const yytype_int8 yyrhs[] =
 {
-      45,     0,    -1,    47,    -1,    53,    -1,    49,    -1,    46,
-      -1,    47,    46,    -1,    17,    -1,    17,    32,    21,    33,
-      -1,    22,    48,    17,    36,    17,    37,    -1,    11,    48,
-      17,    37,    -1,    12,    48,    17,    37,    -1,    24,    48,
-      17,    37,    -1,    17,    -1,    50,    32,    21,    33,    -1,
+      45,     0,    -1,    47,    -1,    53,    -1,    50,    -1,    46,
+      -1,    47,    46,    -1,    17,    -1,    48,    32,    21,    33,
+      -1,    17,    -1,    17,    32,    21,    33,    -1,    22,    49,
+      17,    36,    17,    37,    -1,    11,    49,    17,    37,    -1,
+      12,    49,    17,    37,    -1,    24,    49,    17,    37,    -1,
       17,    17,    -1,    17,    17,    38,    59,    -1,    11,    17,
       17,    -1,    11,    17,    17,    38,    59,    -1,    12,    17,
       17,    -1,    12,    17,    17,    38,    59,    -1,    13,    17,
@@ -486,7 +494,7 @@ static const yytype_int8 yyrhs[] =
       -1,    52,    39,    51,    -1,    17,    17,    40,    52,    41,
       42,    58,    43,    -1,    17,    -1,    17,    38,    59,    -1,
       54,    39,    17,    -1,    54,    39,    17,    38,    59,    -1,
-      50,    54,    -1,    55,    37,    -1,    59,    37,    -1,    57,
+      48,    54,    -1,    55,    37,    -1,    59,    37,    -1,    57,
       37,    -1,    10,    40,    55,    37,    59,    37,    59,    41,
       56,    -1,     9,    40,    59,    41,    56,    -1,    14,    40,
       59,    41,    56,    -1,    14,    40,    59,    41,    56,    16,
@@ -508,14 +516,14 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,    70,    70,    73,    74,    79,    90,   102,   103,   107,
-     108,   109,   110,   117,   118,   126,   127,   128,   129,   130,
-     131,   132,   133,   141,   142,   143,   150,   166,   167,   168,
-     173,   181,   189,   190,   191,   192,   193,   194,   195,   196,
-     197,   198,   199,   204,   209,   210,   220,   222,   223,   224,
-     225,   226,   227,   228,   229,   230,   231,   232,   233,   234,
-     235,   236,   237,   238,   239,   240,   241,   242,   243,   248,
-     249,   253,   258,   259,   265,   269
+       0,    78,    78,    81,    82,    87,    98,   109,   110,   117,
+     118,   122,   123,   124,   125,   134,   135,   136,   137,   138,
+     139,   140,   141,   149,   150,   151,   158,   174,   175,   176,
+     181,   189,   197,   198,   199,   200,   201,   202,   203,   204,
+     205,   206,   207,   212,   217,   218,   228,   230,   231,   232,
+     233,   234,   235,   236,   237,   238,   239,   240,   241,   242,
+     243,   244,   245,   246,   247,   248,   249,   250,   251,   256,
+     257,   261,   266,   267,   273,   277
 };
 #endif
 
@@ -530,10 +538,10 @@ static const char *const yytname[] =
   "ATTRIBUTE", "VARYING", "UNIFORM", "NATIVE_CODE", "'<'", "'>'", "'+'",
   "'-'", "'*'", "'/'", "'['", "']'", "'.'", "NONASSOC_UNARY", "':'", "';'",
   "'='", "','", "'('", "')'", "'{'", "'}'", "$accept", "program",
-  "grammar_elem", "grammar_list", "shader_gvar_type", "shader_globals",
-  "type_node", "fndecl_vardecl_var", "fndecl_vardecl", "function_decl",
-  "vardecl_var_list", "vardecl", "stmt", "assign_stmt", "stmt_list",
-  "expr", "expr_base", "expr_block_expressions", "expr_block",
+  "grammar_elem", "grammar_list", "type_node", "shader_gvar_type",
+  "shader_globals", "fndecl_vardecl_var", "fndecl_vardecl",
+  "function_decl", "vardecl_var_list", "vardecl", "stmt", "assign_stmt",
+  "stmt_list", "expr", "expr_base", "expr_block_expressions", "expr_block",
   "fncall_args", "expr_fncall", YY_NULL
 };
 #endif
@@ -555,7 +563,7 @@ static const yytype_uint16 yytoknum[] =
 static const yytype_uint8 yyr1[] =
 {
        0,    44,    45,    46,    46,    47,    47,    48,    48,    49,
-      49,    49,    49,    50,    50,    51,    51,    51,    51,    51,
+      49,    50,    50,    50,    50,    51,    51,    51,    51,    51,
       51,    51,    51,    52,    52,    52,    53,    54,    54,    54,
       54,    55,    56,    56,    56,    56,    56,    56,    56,    56,
       56,    56,    56,    57,    58,    58,    59,    60,    60,    60,
@@ -567,8 +575,8 @@ static const yytype_uint8 yyr1[] =
 /* YYR2[YYN] -- Number of symbols composing right hand side of rule YYN.  */
 static const yytype_uint8 yyr2[] =
 {
-       0,     2,     1,     1,     1,     1,     2,     1,     4,     6,
-       4,     4,     4,     1,     4,     2,     4,     3,     5,     3,
+       0,     2,     1,     1,     1,     1,     2,     1,     4,     1,
+       4,     6,     4,     4,     4,     2,     4,     3,     5,     3,
        5,     3,     5,     0,     1,     3,     8,     1,     3,     3,
        5,     2,     2,     2,     2,     9,     5,     5,     7,     3,
        5,     3,     2,     3,     1,     2,     1,     3,     4,     3,
@@ -583,11 +591,11 @@ static const yytype_uint8 yyr2[] =
 static const yytype_uint8 yydefact[] =
 {
        0,     0,     0,     0,     0,     0,     0,     5,     2,     4,
-       3,     7,     0,     0,     0,     0,     0,     1,     6,     0,
-       0,     0,    23,     0,     0,     0,    10,    11,     0,     0,
-       0,     0,    24,     0,     0,    12,     8,     0,     0,     0,
+       3,     9,     0,     0,     0,     0,     0,     1,     6,     0,
+       0,     0,    23,     0,     0,     0,    12,    13,     0,     0,
+       0,     0,    24,     0,     0,    14,    10,     0,     0,     0,
       15,     0,     0,     0,    17,    19,    21,     0,    25,     0,
-       9,     0,     0,     0,    50,    63,    64,     0,     0,     0,
+      11,     0,     0,     0,    50,    63,    64,     0,     0,     0,
        0,    16,    46,    66,    65,     0,     0,     0,    50,     0,
        0,     0,     0,     0,    44,     0,     0,     0,    18,    20,
       22,    72,    68,    67,     0,    69,     0,     0,     0,     0,
@@ -595,9 +603,9 @@ static const yytype_uint8 yydefact[] =
        0,     0,     0,     0,    42,     0,     0,     0,    46,    27,
        0,    31,    32,    34,    26,    45,    33,     0,    73,     0,
       47,     0,    71,    52,    51,    55,    57,    54,    53,    56,
-      58,    59,    60,    61,    62,     0,    49,     0,    13,     0,
+      58,    59,    60,    61,    62,     0,    49,     0,     7,     0,
        0,    41,     0,    39,     0,     0,     0,    43,     0,    75,
-      70,    48,     0,     0,     0,     0,    28,    14,    29,    74,
+      70,    48,     0,     0,     0,     0,    28,     8,    29,    74,
       36,     0,    37,    40,     0,     0,     0,    30,     0,    38,
        0,    35
 };
@@ -605,7 +613,7 @@ static const yytype_uint8 yydefact[] =
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-      -1,     6,     7,     8,    12,     9,    72,    32,    33,    10,
+      -1,     6,     7,     8,    72,    12,     9,    32,    33,    10,
      111,    73,    74,    75,    76,    77,    62,    86,    63,   119,
       64
 };
@@ -638,7 +646,7 @@ static const yytype_int16 yypact[] =
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int16 yypgoto[] =
 {
-     -76,   -76,   171,   -76,    48,   -76,   -76,   139,   -76,   -76,
+     -76,   -76,   171,   -76,   -76,    48,   -76,   139,   -76,   -76,
      -76,    80,   -75,   -76,   112,   -47,   -50,   -76,   -76,   -76,
      -76
 };
@@ -649,8 +657,8 @@ static const yytype_int16 yypgoto[] =
 #define YYTABLE_NINF -70
 static const yytype_int16 yytable[] =
 {
-      61,   115,   -13,   109,    78,    79,    80,    82,    83,    84,
-      85,   121,    17,     1,     2,   122,    11,   -13,   110,     3,
+      61,   115,    -7,   109,    78,    79,    80,    82,    83,    84,
+      85,   121,    17,     1,     2,   122,    11,    -7,   110,     3,
       14,   108,   105,    19,     4,    81,     5,    28,    29,    30,
       20,   118,   115,    31,    41,    21,    42,   123,   124,   125,
      126,   127,   128,   129,   130,   131,   132,   133,   134,   135,
@@ -733,14 +741,14 @@ static const yytype_int16 yycheck[] =
    symbol of state STATE-NUM.  */
 static const yytype_uint8 yystos[] =
 {
-       0,    11,    12,    17,    22,    24,    45,    46,    47,    49,
-      53,    17,    48,    48,    17,    48,    48,     0,    46,    32,
+       0,    11,    12,    17,    22,    24,    45,    46,    47,    50,
+      53,    17,    49,    49,    17,    49,    49,     0,    46,    32,
       17,    17,    40,    17,    17,    21,    37,    37,    11,    12,
       13,    17,    51,    52,    36,    37,    33,    17,    17,    17,
       17,    39,    41,    17,    17,    17,    17,    38,    51,    42,
       37,    38,    38,    38,    17,    20,    21,    28,    29,    40,
       42,    59,    60,    62,    64,     9,    10,    14,    17,    19,
-      25,    42,    50,    55,    56,    57,    58,    59,    59,    59,
+      25,    42,    48,    55,    56,    57,    58,    59,    59,    59,
       59,    40,    60,    60,    60,    60,    61,     3,     4,     5,
        6,     7,     8,    26,    27,    28,    29,    30,    31,    32,
       34,    40,    40,    40,    37,    59,    40,    58,    60,    17,
@@ -1711,7 +1719,7 @@ yyreduce:
 
     { 
 			// Create a list of program elements(only functions so far).
-			(yyval.node) = ast->push<ProgramElem>(); 
+			(yyval.node) = ast->push<ProgramElem>(toNodeLocation((yylsp[(1) - (1)]))); 
 			
 			// A program element is not necessary a node. 
 			// For example vertexAttribs/varyings/uniforms they just do a add themselves
@@ -1730,92 +1738,92 @@ yyreduce:
 
   case 7:
 
-    { (yyval.typeDesc) = TypeDesc((yyvsp[(1) - (1)].str_val)); }
+    { (yyval.node) = ast->push<TypeDeclNode>(toNodeLocation((yylsp[(1) - (1)]))); (yyval.node)->As<TypeDeclNode>().typeAsString = (yyvsp[(1) - (1)].str_val); }
     break;
 
   case 8:
 
-    { (yyval.typeDesc) = TypeDesc((yyvsp[(1) - (4)].str_val), (yyvsp[(3) - (4)].int_val)); }
+    { (yyval.node) = (yyvsp[(1) - (4)].node); (yyval.node)->As<TypeDeclNode>().arraySizes.push_back((yyvsp[(3) - (4)].int_val)); }
     break;
 
   case 9:
 
-    { (yyval.node) = nullptr; ast->vertexAttribs.push_back({(yyvsp[(2) - (6)].typeDesc), (yyvsp[(3) - (6)].str_val), (yyvsp[(5) - (6)].str_val)}); }
+    { (yyval.typeDesc) = TypeDesc((yyvsp[(1) - (1)].str_val)); }
     break;
 
   case 10:
 
-    { (yyval.node) = nullptr; ast->stageInputVaryings.push_back({(yyvsp[(2) - (4)].typeDesc), (yyvsp[(3) - (4)].str_val)}); }
+    { (yyval.typeDesc) = TypeDesc((yyvsp[(1) - (4)].str_val), (yyvsp[(3) - (4)].int_val)); }
     break;
 
   case 11:
 
-    { (yyval.node) = nullptr; ast->stageOutputVaryings.push_back({(yyvsp[(2) - (4)].typeDesc), (yyvsp[(3) - (4)].str_val)}); }
+    { (yyval.node) = nullptr; ast->vertexAttribs.push_back({(yyvsp[(2) - (6)].typeDesc), (yyvsp[(3) - (6)].str_val), (yyvsp[(5) - (6)].str_val)}); }
     break;
 
   case 12:
 
-    { (yyval.node) = nullptr; ast->uniforms.push_back({(yyvsp[(2) - (4)].typeDesc), (yyvsp[(3) - (4)].str_val)}); }
+    { (yyval.node) = nullptr; ast->stageInputVaryings.push_back({(yyvsp[(2) - (4)].typeDesc), (yyvsp[(3) - (4)].str_val)}); }
     break;
 
   case 13:
 
-    { (yyval.node) = ast->push<TypeDeclNode>(); (yyval.node)->As<TypeDeclNode>().typeAsString = (yyvsp[(1) - (1)].str_val); }
+    { (yyval.node) = nullptr; ast->stageOutputVaryings.push_back({(yyvsp[(2) - (4)].typeDesc), (yyvsp[(3) - (4)].str_val)}); }
     break;
 
   case 14:
 
-    { (yyval.node) = (yyvsp[(1) - (4)].node); (yyval.node)->As<TypeDeclNode>().arraySizes.push_back((yyvsp[(3) - (4)].int_val)); }
+    { (yyval.node) = nullptr; ast->uniforms.push_back({(yyvsp[(2) - (4)].typeDesc), (yyvsp[(3) - (4)].str_val)}); }
     break;
 
   case 15:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(TypeDesc((yyvsp[(1) - (2)].str_val)), (yyvsp[(2) - (2)].str_val), nullptr, FNAT_In   ); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toNodeLocation((yylsp[(1) - (2)])), TypeDesc((yyvsp[(1) - (2)].str_val)), (yyvsp[(2) - (2)].str_val), nullptr, FNAT_In   ); }
     break;
 
   case 16:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(TypeDesc((yyvsp[(1) - (4)].str_val)), (yyvsp[(2) - (4)].str_val), (yyvsp[(4) - (4)].node)     , FNAT_In   ); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toNodeLocation((yylsp[(1) - (4)])), TypeDesc((yyvsp[(1) - (4)].str_val)), (yyvsp[(2) - (4)].str_val), (yyvsp[(4) - (4)].node)     , FNAT_In   ); }
     break;
 
   case 17:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(TypeDesc((yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_In	); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toNodeLocation((yylsp[(1) - (3)])), TypeDesc((yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_In	); }
     break;
 
   case 18:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(TypeDesc((yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_In	); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toNodeLocation((yylsp[(1) - (5)])), TypeDesc((yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_In	); }
     break;
 
   case 19:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(TypeDesc((yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_Out  ); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toNodeLocation((yylsp[(1) - (3)])), TypeDesc((yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_Out  ); }
     break;
 
   case 20:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(TypeDesc((yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_Out  ); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toNodeLocation((yylsp[(1) - (5)])), TypeDesc((yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_Out  ); }
     break;
 
   case 21:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(TypeDesc((yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_InOut); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toNodeLocation((yylsp[(1) - (3)])), TypeDesc((yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_InOut); }
     break;
 
   case 22:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(TypeDesc((yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_InOut); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toNodeLocation((yylsp[(1) - (5)])), TypeDesc((yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_InOut); }
     break;
 
   case 23:
 
-    { (yyval.node) = ast->push<FuncDecl>(); }
+    { (yyval.node) = ast->push<FuncDecl>(NodeLocation()); }
     break;
 
   case 24:
 
-    { (yyval.node) = ast->push<FuncDecl>(); ((FuncDecl*)(yyval.node))->args.push_back((yyvsp[(1) - (1)].node)); }
+    { (yyval.node) = ast->push<FuncDecl>(toNodeLocation((yylsp[(1) - (1)]))); ((FuncDecl*)(yyval.node))->args.push_back((yyvsp[(1) - (1)].node)); }
     break;
 
   case 25:
@@ -1836,12 +1844,12 @@ yyreduce:
 
   case 27:
 
-    { (yyval.node) = ast->push<VarDecl>((yyvsp[(1) - (1)].str_val), nullptr); }
+    { (yyval.node) = ast->push<VarDecl>(toNodeLocation((yylsp[(1) - (1)])), (yyvsp[(1) - (1)].str_val), nullptr); }
     break;
 
   case 28:
 
-    { (yyval.node) = ast->push<VarDecl>((yyvsp[(1) - (3)].str_val), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<VarDecl>(toNodeLocation((yylsp[(1) - (3)])), (yyvsp[(1) - (3)].str_val), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 29:
@@ -1884,22 +1892,22 @@ yyreduce:
 
   case 35:
 
-    { (yyval.node) = ast->push<StmtFor>((yyvsp[(3) - (9)].node), (yyvsp[(5) - (9)].node), (yyvsp[(7) - (9)].node), (yyvsp[(9) - (9)].node)); }
+    { (yyval.node) = ast->push<StmtFor>(toNodeLocation((yylsp[(1) - (9)])), (yyvsp[(3) - (9)].node), (yyvsp[(5) - (9)].node), (yyvsp[(7) - (9)].node), (yyvsp[(9) - (9)].node)); }
     break;
 
   case 36:
 
-    { (yyval.node) = ast->push<StmtWhile>((yyvsp[(3) - (5)].node), (yyvsp[(5) - (5)].node)); }
+    { (yyval.node) = ast->push<StmtWhile>(toNodeLocation((yylsp[(1) - (5)])),(yyvsp[(3) - (5)].node), (yyvsp[(5) - (5)].node)); }
     break;
 
   case 37:
 
-    { (yyval.node) = ast->push<StmtIf>((yyvsp[(3) - (5)].node), (yyvsp[(5) - (5)].node), nullptr); }
+    { (yyval.node) = ast->push<StmtIf>(toNodeLocation((yylsp[(1) - (5)])), (yyvsp[(3) - (5)].node), (yyvsp[(5) - (5)].node), nullptr); }
     break;
 
   case 38:
 
-    { (yyval.node) = ast->push<StmtIf>((yyvsp[(3) - (7)].node), (yyvsp[(5) - (7)].node), (yyvsp[(7) - (7)].node)); }
+    { (yyval.node) = ast->push<StmtIf>(toNodeLocation((yylsp[(1) - (7)])), (yyvsp[(3) - (7)].node), (yyvsp[(5) - (7)].node), (yyvsp[(7) - (7)].node)); }
     break;
 
   case 39:
@@ -1909,27 +1917,27 @@ yyreduce:
 
   case 40:
 
-    { (yyval.node) = ast->push<StmtNativeCode>((yyvsp[(3) - (5)].str_val)); }
+    { (yyval.node) = ast->push<StmtNativeCode>(toNodeLocation((yylsp[(1) - (5)])), (yyvsp[(3) - (5)].str_val)); }
     break;
 
   case 41:
 
-    { (yyval.node) = ast->push<StmtReturn>((yyvsp[(2) - (3)].node)); }
+    { (yyval.node) = ast->push<StmtReturn>(toNodeLocation((yylsp[(1) - (3)])), (yyvsp[(2) - (3)].node)); }
     break;
 
   case 42:
 
-    { (yyval.node) = ast->push<StmtReturn>(); }
+    { (yyval.node) = ast->push<StmtReturn>(toNodeLocation((yylsp[(1) - (2)]))); }
     break;
 
   case 43:
 
-    { (yyval.node) = ast->push<Assign>((yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<Assign>(toNodeLocation((yylsp[(1) - (3)])), (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 44:
 
-    { (yyval.node) = ast->push<StmtList>(); (yyval.node)->As<StmtList>().nodes.push_back((yyvsp[(1) - (1)].node)); }
+    { (yyval.node) = ast->push<StmtList>(toNodeLocation((yylsp[(1) - (1)]))); (yyval.node)->As<StmtList>().nodes.push_back((yyvsp[(1) - (1)].node)); }
     break;
 
   case 45:
@@ -1952,87 +1960,87 @@ yyreduce:
 
   case 48:
 
-    { (yyval.node) = ast->push<ExprIndexing>((yyvsp[(1) - (4)].node), (yyvsp[(3) - (4)].node)); }
+    { (yyval.node) = ast->push<ExprIndexing>(toNodeLocation((yylsp[(1) - (4)])), (yyvsp[(1) - (4)].node), (yyvsp[(3) - (4)].node)); }
     break;
 
   case 49:
 
-    { (yyval.node) = ast->push<ExprMemberAccess>((yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].str_val)); }
+    { (yyval.node) = ast->push<ExprMemberAccess>(toNodeLocation((yylsp[(1) - (3)])), (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].str_val)); }
     break;
 
   case 50:
 
-    { (yyval.node) = ast->push<Ident>((yyvsp[(1) - (1)].str_val)); }
+    { (yyval.node) = ast->push<Ident>(toNodeLocation((yylsp[(1) - (1)])), (yyvsp[(1) - (1)].str_val)); }
     break;
 
   case 51:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_Or, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_Or, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 52:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_And, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_And, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 53:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_NEquals, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_NEquals, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 54:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_Equals, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_Equals, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 55:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_LEquals, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_LEquals, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 56:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_Less, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_Less, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 57:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_GEquals, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_GEquals, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 58:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_Greater, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_Greater, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 59:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_Add, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_Add, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 60:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_Sub, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_Sub, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 61:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_Mul, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_Mul, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 62:
 
-    { (yyval.node) = ast->push<ExprBin>(EBT_Div, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
+    { (yyval.node) = ast->push<ExprBin>(toNodeLocation((yylsp[(1) - (3)])), EBT_Div, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node)); }
     break;
 
   case 63:
 
-    { (yyval.node) = ast->push<ExprLiteral>((yyvsp[(1) - (1)].float_val)); }
+    { (yyval.node) = ast->push<ExprLiteral>(toNodeLocation((yylsp[(1) - (1)])), (yyvsp[(1) - (1)].float_val)); }
     break;
 
   case 64:
 
-    { (yyval.node) = ast->push<ExprLiteral>((yyvsp[(1) - (1)].int_val)); }
+    { (yyval.node) = ast->push<ExprLiteral>(toNodeLocation((yylsp[(1) - (1)])), (yyvsp[(1) - (1)].int_val)); }
     break;
 
   case 65:
@@ -2057,7 +2065,7 @@ yyreduce:
 
   case 69:
 
-    { (yyval.node) = ast->push<ExprBlock>(); (yyval.node)->As<ExprBlock>().exprs.push_back((yyvsp[(1) - (1)].node)); }
+    { (yyval.node) = ast->push<ExprBlock>(toNodeLocation((yylsp[(1) - (1)]))); (yyval.node)->As<ExprBlock>().exprs.push_back((yyvsp[(1) - (1)].node)); }
     break;
 
   case 70:
@@ -2072,13 +2080,13 @@ yyreduce:
 
   case 72:
 
-    { (yyval.node) = ast->push<FuncCall>(); }
+    { (yyval.node) = ast->push<FuncCall>(NodeLocation()); }
     break;
 
   case 73:
 
     { 
-					Node* fnCall = ast->push<FuncCall>();
+					Node* fnCall = ast->push<FuncCall>(toNodeLocation((yylsp[(1) - (1)])));
 					fnCall->As<FuncCall>().args.push_back((yyvsp[(1) - (1)].node)); 
 					(yyval.node) = fnCall;
 				  }
