@@ -515,7 +515,8 @@ static yyconst flex_int32_t yy_rule_can_match_eol[25] =
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 #line 1 "lang.l"
-#line 9 "lang.l"
+#define YY_NO_UNISTD_H 1
+#line 10 "lang.l"
 #include <stdio.h>
 #include <string>
 #include "ast.h"
@@ -529,14 +530,17 @@ static yyconst flex_int32_t yy_rule_can_match_eol[25] =
 
 #define YY_USER_ACTION yylloc->first_line = yylloc->last_line = yylineno;
 
-#line 533 "lang.lex.yy.cpp"
+#line 534 "lang.lex.yy.cpp"
 
 #define INITIAL 0
 
-/*windows compatibility case*/
-#include <io.h>
-#define isatty _isatty
-#define fileno _fileno
+#ifndef YY_NO_UNISTD_H
+/* Special case for "unistd.h", since it is non-ANSI. We include it way
+ * down here because we want the user's section 1 to have been scanned first.
+ * The user has a chance to override it with an option.
+ */
+#include <unistd.h>
+#endif
     
 #ifndef YY_EXTRA_TYPE
 #define YY_EXTRA_TYPE void *
@@ -771,11 +775,11 @@ YY_DECL
 	register int yy_act;
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
-#line 24 "lang.l"
+#line 25 "lang.l"
 
 
 
-#line 779 "lang.lex.yy.cpp"
+#line 783 "lang.lex.yy.cpp"
 
     yylval = yylval_param;
 
@@ -873,125 +877,125 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 27 "lang.l"
+#line 28 "lang.l"
 ;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 28 "lang.l"
+#line 29 "lang.l"
 { ast->addLineMarker(LineMarker(yylineno, yytext)); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 29 "lang.l"
+#line 30 "lang.l"
 return FOR;
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 30 "lang.l"
+#line 31 "lang.l"
 return IF;
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 31 "lang.l"
+#line 32 "lang.l"
 return ELSE;
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 32 "lang.l"
+#line 33 "lang.l"
 return WHILE;
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 33 "lang.l"
+#line 34 "lang.l"
 return IN;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 34 "lang.l"
+#line 35 "lang.l"
 return OUT;
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 35 "lang.l"
+#line 36 "lang.l"
 return INOUT;
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 36 "lang.l"
+#line 37 "lang.l"
 return ATTRIBUTE;
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 37 "lang.l"
+#line 38 "lang.l"
 return UNIFORM;
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 38 "lang.l"
+#line 39 "lang.l"
 return NATIVE_CODE;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 39 "lang.l"
+#line 40 "lang.l"
 return RETURN;
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 40 "lang.l"
+#line 41 "lang.l"
 { yylval->str_val = std::string(yytext); return IDENT; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 41 "lang.l"
+#line 42 "lang.l"
 { yylval->float_val = atof(yytext); return NUM_FLOAT; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 42 "lang.l"
+#line 43 "lang.l"
 { yylval->int_val = atoi(yytext); return NUM_INT; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 43 "lang.l"
+#line 44 "lang.l"
 return AND;
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 44 "lang.l"
+#line 45 "lang.l"
 return OR;
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 45 "lang.l"
+#line 46 "lang.l"
 return LE;
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 46 "lang.l"
+#line 47 "lang.l"
 return GE;
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 47 "lang.l"
+#line 48 "lang.l"
 return EQUALS;
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 48 "lang.l"
+#line 49 "lang.l"
 return NOTEQUALS;
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 49 "lang.l"
+#line 50 "lang.l"
 return *yytext;
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 50 "lang.l"
+#line 51 "lang.l"
 ECHO;
 	YY_BREAK
-#line 995 "lang.lex.yy.cpp"
+#line 999 "lang.lex.yy.cpp"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -2179,7 +2183,7 @@ void yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 49 "lang.l"
+#line 50 "lang.l"
 
 
 

@@ -12,9 +12,9 @@ using namespace XSR;
 
 struct Ast;
 
-struct NodeLocation
+struct Location
 {
-	NodeLocation() :
+	Location() :
 		line(-1), column(-1)
 	{}
 
@@ -26,18 +26,19 @@ struct NodeLocation
 	int column;
 };
 
-struct ParseExcept : public std::logic_error {
-	ParseExcept(const NodeLocation& errorLoc, const char* msg) :
-		std::logic_error(msg), 
-		errorLoc(errorLoc)
+struct ParseExcept : public std::exception {
+	ParseExcept(const Location& errorLoc, const char* msg) :
+		errorLoc(errorLoc),
+		msg(msg)
 	{}
 
-	ParseExcept(const NodeLocation& errorLoc, const std::string& msg) :
-		std::logic_error(msg.c_str()), 
-		errorLoc(errorLoc)
+	ParseExcept(const Location& errorLoc, const std::string& msg) :
+		errorLoc(errorLoc),
+		msg(msg)
 	{}
 
-	NodeLocation errorLoc;
+	Location errorLoc;
+	std::string msg;
 };
 
 enum Type
@@ -284,7 +285,7 @@ public :
 	bool inParens = false; // True if the expression is surrounded with parens.
 	bool inBlock = false; // True if the statement is surrounded by { }
 	bool hasSemicolon = false; // True if the statement is of kind <--->; 
-	NodeLocation location;
+	Location location;
 };
 
 struct Ast
@@ -297,7 +298,7 @@ struct Ast
 	}
 
 	template<typename T, typename... Args>
-	T* push(const NodeLocation location, Args... args) {
+	T* push(const Location location, Args... args) {
 		T* node = new T(args...);
 		node->location = location;
 		nodes.push_back(node);

@@ -4,6 +4,7 @@
 %option yylineno
 %option never-interactive
 %option noyywrap
+%option nounistd
 
 %{
 #include <stdio.h>

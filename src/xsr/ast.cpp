@@ -39,22 +39,23 @@ TypeDesc::TypeDesc(std::string strType, int arraySize)
 
 std::string TypeDesc::GetXShaderTypeName(const Type type)
 {
-	if(type == Type_void) return "void";
-	if(type == Type_bool) return "bool";
-	if(type == Type_int) return "int";
-	if(type == Type_vec2i) return "vec2i";
-	if(type == Type_vec3i) return "vec3i";
-	if(type == Type_vec4i) return "vec4i";
-	if(type == Type_mat4f) return "mat4f";
-	if(type == Type_float) return "float";
-	if(type == Type_vec2f) return "vec2f";
-	if(type == Type_vec3f) return "vec3f";
-	if(type == Type_vec4f) return "vec4f";
-	if(type == Type_mat4f) return "mat4f";
-	if(type == Type_Texture2D) return "Texture2D";
+	if(type == Type_void)        return "void";
+	if(type == Type_bool)        return "bool";
+	if(type == Type_int)         return "int";
+	if(type == Type_vec2i)       return "vec2i";
+	if(type == Type_vec3i)       return "vec3i";
+	if(type == Type_vec4i)       return "vec4i";
+	if(type == Type_mat4f)       return "mat4f";
+	if(type == Type_float)       return "float";
+	if(type == Type_vec2f)       return "vec2f";
+	if(type == Type_vec3f)       return "vec3f";
+	if(type == Type_vec4f)       return "vec4f";
+	if(type == Type_mat4f)       return "mat4f";
+	if(type == Type_Texture2D)   return "Texture2D";
 	if(type == Type_TextureCube) return "TextureCube";
 
-	throw ParseExcept(NodeLocation(), "GetXShaderTypeName called with unknow argument!");
+	XSR_ASSERT(false);
+	return std::string();
 }
 
 TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& member)
@@ -77,7 +78,7 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 		{
 			for(auto ch : member) {
 				if(ch != 'x' && ch != 'y' && ch != 'z' && ch != 'w') {
-					throw ParseExcept(NodeLocation(), "Trying to reference unexisting member: " + member);
+					throw ParseExcept(Location(), "Trying to reference unexisting member: " + member);
 				}
 			}
 
@@ -98,7 +99,7 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 		}
 	}
 
-	throw ParseExcept(NodeLocation(), "Unknown member access: " + member);
+	throw ParseExcept(Location(), "Unknown member access: " + member);
 }
 
 std::string TypeDesc::GetTypeAsString(const LangSettings& lang, const bool omitArraySize) const 
@@ -165,12 +166,12 @@ LineMarker::LineMarker(const int sourceLine, const char* const matchedString) :
 
 	if(ln < 5)
 	{
-		throw ParseExcept(NodeLocation(), "Invalid #line command.");
+		throw ParseExcept(Location(), "Invalid #line command.");
 	}
 
 	if(memcmp("#line", matchedString, 5)!=0)
 	{
-		ParseExcept(NodeLocation(), "Unknown preprocessor directive!");
+		ParseExcept(Location(), "Unknown preprocessor directive!");
 	}
 
 	size_t idx = 5;
@@ -192,7 +193,7 @@ LineMarker::LineMarker(const int sourceLine, const char* const matchedString) :
 
 		if(lineRead==false) {
 			if(isdigit(ch)) targetLine = targetLine * 10 + (ch - '0');
-			else throw ParseExcept(NodeLocation(), "Invalid #line macro, invalid line number.");
+			else throw ParseExcept(Location(), "Invalid #line macro, invalid line number.");
 		}
 
 		// The line has been read, this must be the filename.
@@ -219,7 +220,7 @@ LineMarker::LineMarker(const int sourceLine, const char* const matchedString) :
 
 	if(!lineRead || (openQuoteFound && !openQuoteFound))
 	{
-		throw ParseExcept(NodeLocation(), "Invalid #line command.");
+		throw ParseExcept(Location(), "Invalid #line command.");
 	}
 }
 
@@ -268,7 +269,7 @@ const Ast::FullVariableDesc* Ast::declareVariable(const TypeDesc& td, const std:
 	std::find_if(begin(declaredVariables), end(declaredVariables), [&fvd, &name](FullVariableDesc v)
 	{
 		const bool equal = fvd.fullName == v.fullName;
-		if(equal) throw ParseExcept(NodeLocation(), "Variable with name '" + name + "' is already defined!");
+		if(equal) throw ParseExcept(Location(), "Variable with name '" + name + "' is already defined!");
 		return equal;
 	});
 
@@ -311,7 +312,7 @@ const Ast::FullVariableDesc* Ast::findVarInCurrentScope(const std::string& name)
 		depth--;
 	}
 
-	throw ParseExcept(NodeLocation(), "Referenced an undefined variable: " + name);
+	throw ParseExcept(Location(), "Referenced an undefined variable: " + name);
 }
 
 const Ast::FullFuncionDesc& Ast::findFuncDecl(const std::string& name)
@@ -321,7 +322,7 @@ const Ast::FullFuncionDesc& Ast::findFuncDecl(const std::string& name)
 		if(f.fullName == name) return f;
 	}
 
-	throw ParseExcept(NodeLocation(), "Referenced an undefined funcion: " + name);
+	throw ParseExcept(Location(), "Referenced an undefined funcion: " + name);
 }
 
 void Ast::declareFunction(const TypeDesc& returnType, const std::string& name)
@@ -527,20 +528,21 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 
 		case EBT_Mul : 
 		{
-			if(lt == rt) resolvedType = lt;
-			else if(isPairOf(Type_int, Type_float)) resolvedType = TypeDesc(Type_float);
+			if(lt == rt)                              resolvedType = lt;
+			else if(isPairOf(Type_int, Type_float))   resolvedType = TypeDesc(Type_float);
 			else if(isPairOf(Type_float, Type_vec2f)) resolvedType = TypeDesc(Type_vec2f);
 			else if(isPairOf(Type_float, Type_vec3f)) resolvedType = TypeDesc(Type_vec3f);
 			else if(isPairOf(Type_float, Type_vec4f)) resolvedType = TypeDesc(Type_vec4f);
 			else if(isPairOf(Type_mat4f, Type_vec4f)) resolvedType = TypeDesc(Type_vec4f);
 			else if(isPairOf(Type_mat4f, Type_float)) resolvedType = TypeDesc(Type_mat4f);
 			else if(isPairOf(Type_mat4f, Type_mat4f)) resolvedType = TypeDesc(Type_mat4f);
-			else if(isPairOf(Type_mat4f, Type_int)) resolvedType = TypeDesc(Type_mat4f);
+			else if(isPairOf(Type_mat4f, Type_int))   resolvedType = TypeDesc(Type_mat4f);
 			
 			// The type should be deduced by now, if not this is an error.
-			if(resolvedType == Type_Undeduced)
+			if(resolvedType == Type_Undeduced){
 				throw ParseExcept(location, "* operator called with incompatible types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
-		
+			}
+
 			break;
 		}
 		
@@ -668,6 +670,10 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 		for(int t = Type_BuiltInTypeBegin + 1; t < Type_BuiltInTypeEnd; ++t)
 		{
 			const std::string typeName = TypeDesc::GetXShaderTypeName((Type)t);
+
+			if(typeName.empty()){
+				throw ParseExcept(location, "A unnamed type found!");
+			}
 		
 			if(fnName == typeName) 
 			{
@@ -1274,7 +1280,7 @@ namespace XSR
 			XSParseExpression(processedCode.c_str(), &ast); // Build the AST tree.
 
 			if(!ast.program) {
-				throw ParseExcept(NodeLocation(), ast.bisonParseError.empty() ? "Failed while compiling program!" : ast.bisonParseError);
+				throw ParseExcept(Location(), ast.bisonParseError.empty() ? "Failed while compiling program!" : ast.bisonParseError);
 			}
 
 			// Declare the predefined functions for the language.

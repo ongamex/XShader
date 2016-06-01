@@ -117,11 +117,11 @@ int yyparse ();
 /* "%code provides" blocks.  */
 
 
-   #define YY_DECL \
+	#define YY_DECL \
 	   int yylex(YYSTYPE* yylval_param, YYLTYPE* yylloc_param, yyscan_t yyscanner, Ast* ast)
-   YY_DECL;
-
-   void yyerror(YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
+	YY_DECL;
+	
+	void yyerror(YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
 
 
 
