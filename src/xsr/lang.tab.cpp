@@ -74,8 +74,6 @@ typedef void* yyscan_t;
 #include "lang.tab.h"
 #include "lang.yystype.h"
 
-int yylex(YYSTYPE*, YYLTYPE*, yyscan_t);
-void yyerror (YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
 
 bool parseExpression(const std::string& inp);
 
@@ -117,6 +115,13 @@ NodeLocation toNodeLocation(const YYLTYPE& yyl) {
 #if YYDEBUG
 extern int yydebug;
 #endif
+/* "%code requires" blocks.  */
+
+
+	#include "lang.yystype.h"
+
+
+
 
 /* Tokens.  */
 #ifndef YYTOKENTYPE
@@ -185,6 +190,17 @@ int yyparse (yyscan_t scanner, Ast* ast);
 int yyparse ();
 #endif
 #endif /* ! YYPARSE_PARAM */
+/* "%code provides" blocks.  */
+
+
+   #define YY_DECL \
+	   int yylex(YYSTYPE* yylval_param, YYLTYPE* yylloc_param, yyscan_t yyscanner, Ast* ast)
+   YY_DECL;
+
+   void yyerror(YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
+
+
+
 
 #endif /* !YY_YY_LANG_TAB_H_INCLUDED  */
 
@@ -516,14 +532,14 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,    78,    78,    81,    82,    87,    98,   109,   110,   117,
-     118,   122,   123,   124,   125,   134,   135,   136,   137,   138,
-     139,   140,   141,   149,   150,   151,   158,   174,   175,   176,
-     181,   189,   197,   198,   199,   200,   201,   202,   203,   204,
-     205,   206,   207,   212,   217,   218,   228,   230,   231,   232,
-     233,   234,   235,   236,   237,   238,   239,   240,   241,   242,
-     243,   244,   245,   246,   247,   248,   249,   250,   251,   256,
-     257,   261,   266,   267,   273,   277
+       0,    90,    90,    93,    94,    99,   110,   121,   122,   129,
+     130,   134,   135,   136,   137,   146,   147,   148,   149,   150,
+     151,   152,   153,   161,   162,   163,   170,   186,   187,   188,
+     193,   201,   209,   210,   211,   212,   213,   214,   215,   216,
+     217,   218,   219,   224,   229,   230,   240,   242,   243,   244,
+     245,   246,   247,   248,   249,   250,   251,   252,   253,   254,
+     255,   256,   257,   258,   259,   260,   261,   262,   263,   268,
+     269,   273,   278,   279,   285,   289
 };
 #endif
 
@@ -901,7 +917,7 @@ yy_location_print_ (yyo, yylocp)
 #ifdef YYLEX_PARAM
 # define YYLEX yylex (&yylval, &yylloc, YYLEX_PARAM)
 #else
-# define YYLEX yylex (&yylval, &yylloc, scanner)
+# define YYLEX yylex (&yylval, &yylloc, scanner, ast)
 #endif
 
 /* Enable debugging if requested.  */

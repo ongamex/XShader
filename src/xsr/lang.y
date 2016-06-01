@@ -1,10 +1,24 @@
+%code requires {
+	#include "lang.yystype.h"
+}
+
 %define api.pure full
 %locations
 %no-lines
 %error-verbose
-%lex-param {yyscan_t scanner}
 %parse-param {yyscan_t scanner}
 %parse-param {Ast* ast}
+%lex-param {yyscan_t scanner}
+%lex-param { Ast* ast }
+
+%code provides {
+   #define YY_DECL \
+	   int yylex(YYSTYPE* yylval_param, YYLTYPE* yylloc_param, yyscan_t yyscanner, Ast* ast)
+   YY_DECL;
+
+   void yyerror(YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
+}
+
 
 %{
 typedef void* yyscan_t;
@@ -17,8 +31,6 @@ typedef void* yyscan_t;
 #include "lang.tab.h"
 #include "lang.yystype.h"
 
-int yylex(YYSTYPE*, YYLTYPE*, yyscan_t);
-void yyerror (YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
 
 bool parseExpression(const std::string& inp);
 

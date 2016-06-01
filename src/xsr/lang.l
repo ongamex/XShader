@@ -2,6 +2,8 @@
 %option bison-bridge 
 %option bison-locations
 %option yylineno
+%option never-interactive
+%option noyywrap
 
 %{
 #include <stdio.h>
@@ -10,22 +12,20 @@
 #include "lang.tab.h"
 #include "lang.yystype.h"
 
-//		YYLTYPE* lval = yyget_lloc(yyscanner);
+// [TODO] Ivestigate when ECHO is called and eventuall add a proper fix.
+// I've added this because in some caes flex will call fwrite and some other stange function
+// causing casing a crash in non console application.
+#define ECHO do {} while(false)
+
 #define YY_USER_ACTION yylloc->first_line = yylloc->last_line = yylineno;
 
-//void yyerror (YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
 %}
 
 %%
 
 
-"//".*[\n]			{}
-\"(\\.|[^"])*\"		{ 
-						// remove the heading and trailing "
-						yylval->str_val = std::string(yytext+1); yylval->str_val.pop_back(); 
-						return CODE_STRING; 
-					}
-[ \t\n]													;
+"//".*[\n]												;
+"#line"[ ]+[1-9][0-9]*(.*)?								{ ast->addLineMarker(LineMarker(yylineno, yytext)); }
 "for"													return FOR;
 "if"													return IF;
 "else"													return ELSE;
@@ -49,10 +49,6 @@
 [-()<>=+*/;{},.:\[\]] 									return *yytext;
 %%
 
-int yywrap(yyscan_t yyscanner)
-{
-	return 1;
-}
 	//The function that knows how to parse the language.
 namespace XSR {
 	bool XSParseExpression(const char* code, Ast* ast)

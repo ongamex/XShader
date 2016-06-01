@@ -181,6 +181,30 @@ private :
 	//int m_arraySize = 0; // 0 means that this is not an array.
 };
 
+// A so called line marker, that holds the data specified by "#line" directive.
+// Examples:
+// #line 5
+// #line "my_source_file.xsr"
+//
+// Basically this should work just like the C++ preprocessor.
+struct LineMarker
+{
+	LineMarker(const int sourceLine = -1, const int targetLine = -1, const char* filename = "") :
+		sourceLine(sourceLine),
+		targetLine(targetLine),
+		filename(filename)
+	{}
+
+	// The input is the matched string directly taken from flex.
+	// The string is decomposed by this function.
+	LineMarker(const int sourceLine, const char* const matchedString);
+
+	int sourceLine; // The line number where "#line" was found in the code being compiled
+	int targetLine; // The line number specified in the "#line" (aka. the line number).
+	std::string filename; // Optional, The filename specified by the "#line". 
+};
+
+
 enum ExprBinType
 { 
 	EBT_Add, 
@@ -222,7 +246,6 @@ struct Uniforms
 	TypeDesc type;
 	std::string varName;
 };
-
 
 struct Node
 {
@@ -280,6 +303,13 @@ struct Ast
 		nodes.push_back(node);
 		return node;
 	}
+
+	// Add a line marker used to resolve where an eventual comiling error actually is.
+	// A an implementation detail, this function does a sorted insert.
+	void addLineMarker(const LineMarker& marker);
+
+	// Find the LineMaker for the given line in the source being compiled.
+	const LineMarker* findLineMarker(const int sourceLine);
 
 	// During declaration pass, these are used in order to 
 	// set change the current scope for defining and searching for variables.
@@ -343,6 +373,10 @@ struct Ast
 	// Thorws ParseExcept if missing. 
 	const FullVariableDesc* findVarInCurrentScope(const std::string& name);
 	const FullFuncionDesc& findFuncDecl(const std::string& name);
+
+	// A list of line markers, marking where the code below it was originally.
+	// [CAUTION] This structure must be sorted by sourceLine!!!
+	std::vector<LineMarker> lineMarkers;
 
 	Node* program = nullptr; // The root node.
 	std::vector<Node*> nodes;

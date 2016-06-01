@@ -39,6 +39,13 @@
 #if YYDEBUG
 extern int yydebug;
 #endif
+/* "%code requires" blocks.  */
+
+
+	#include "lang.yystype.h"
+
+
+
 
 /* Tokens.  */
 #ifndef YYTOKENTYPE
@@ -107,5 +114,16 @@ int yyparse (yyscan_t scanner, Ast* ast);
 int yyparse ();
 #endif
 #endif /* ! YYPARSE_PARAM */
+/* "%code provides" blocks.  */
+
+
+   #define YY_DECL \
+	   int yylex(YYSTYPE* yylval_param, YYLTYPE* yylloc_param, yyscan_t yyscanner, Ast* ast)
+   YY_DECL;
+
+   void yyerror(YYLTYPE* loc, yyscan_t yyscanner, Ast* ast, const char* msg);
+
+
+
 
 #endif /* !YY_YY_LANG_TAB_H_INCLUDED  */

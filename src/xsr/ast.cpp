@@ -1,10 +1,11 @@
 #pragma once
 
 #include <algorithm>
-#include "ast.h"
-
 #include <stdarg.h>  // For va_start, etc.
 #include <memory>    // For std::unique_ptr
+#include <cstring>
+
+#include "ast.h"
 
 namespace
 {
@@ -155,8 +156,104 @@ std::string TypeDesc::ComposeVarDecl(const LangSettings& lang, const std::string
 }
 
 //-----------------------------------------------------------------------
+// LineMarker
+//-----------------------------------------------------------------------
+LineMarker::LineMarker(const int sourceLine, const char* const matchedString) :
+	sourceLine(sourceLine)
+{
+	const size_t ln = strlen(matchedString);
+
+	if(ln < 5)
+	{
+		throw ParseExcept(NodeLocation(), "Invalid #line command.");
+	}
+
+	if(memcmp("#line", matchedString, 5)!=0)
+	{
+		ParseExcept(NodeLocation(), "Unknown preprocessor directive!");
+	}
+
+	size_t idx = 5;
+	targetLine = 0;
+
+	bool lineRead = false;
+	bool openQuoteFound = false;
+	bool closeQuoteFound = false;
+
+	for(;idx<=ln; idx++)
+	{
+		const char ch = matchedString[idx];
+
+		if(isspace(ch) || ch == '\0')
+		{
+			if(targetLine!=0) lineRead = true;
+			continue;
+		}
+
+		if(lineRead==false) {
+			if(isdigit(ch)) targetLine = targetLine * 10 + (ch - '0');
+			else throw ParseExcept(NodeLocation(), "Invalid #line macro, invalid line number.");
+		}
+
+		// The line has been read, this must be the filename.
+		if(lineRead==true)
+		{
+			if(ch == '\"')
+			{
+				if(openQuoteFound==false)
+				{
+					openQuoteFound = true;
+				}
+				else
+				{
+					closeQuoteFound = true;
+					break;
+				}
+			}
+			else if(openQuoteFound)
+			{
+				filename.push_back(ch);
+			}
+		}
+	}
+
+	if(!lineRead || (openQuoteFound && !openQuoteFound))
+	{
+		throw ParseExcept(NodeLocation(), "Invalid #line command.");
+	}
+}
+
+
+//-----------------------------------------------------------------------
 // Ast
 //-----------------------------------------------------------------------
+void Ast::addLineMarker(const LineMarker& marker)
+{
+	std::vector<LineMarker>::iterator itr = lineMarkers.begin();
+
+	// Find the 1st element with bigger sourceLine, 
+	// so all line markers are kept in order.
+	for(size_t t = 0; t < lineMarkers.size(); ++t)
+	{
+		if(lineMarkers[t].sourceLine > itr->sourceLine)
+		{
+			itr = lineMarkers.begin() + t;
+		}
+	}
+
+	lineMarkers.insert(itr, marker);
+}
+
+const LineMarker* Ast::findLineMarker(const int sourceLine)
+{
+	for(const LineMarker& lineMarker : lineMarkers)
+	{
+		if(sourceLine > lineMarker.sourceLine) return &lineMarker;
+	}
+
+	return nullptr;
+}
+
 const Ast::FullVariableDesc* Ast::declareVariable(const TypeDesc& td, const std::string& name, VarTrait trait)
 {
 	FullVariableDesc fvd;
@@ -382,7 +479,7 @@ std::string ExprBin::Internal_GenerateCode(Ast* ast)
 		case EBT_Equals :   return left->GenerateCode(ast) + (" == ") + right->GenerateCode(ast);
 		case EBT_NEquals :  return left->GenerateCode(ast) + (" != ") + right->GenerateCode(ast);
 		case EBT_Or :       return left->GenerateCode(ast) + (" || ") + right->GenerateCode(ast);
-		case EBT_And :      return left->GenerateCode(ast) + (" && ") + right->GenerateCode(ast);         
+		case EBT_And :      return left->GenerateCode(ast) + (" && ") + right->GenerateCode(ast);
 	}
 
 	throw ParseExcept(location, "Unknown bynary opt!");
@@ -1163,15 +1260,16 @@ namespace XSR
 		std::string& result,
 		std::string& compilationErrors)
 	{
+		Ast ast;
+
 		try 
 		{
-			Ast ast;
 			ast.lang = langSettings;
 
 			// [CAUTION] For some reason FLEX doens't like '\r' symbol (maybe there are others as well...)
 			// It crashes randomly somewhere in isatty...
 			std::string processedCode = pCode;
-			std::replace(processedCode.begin(), processedCode.end(), '\r', ' ');
+			//std::replace(processedCode.begin(), processedCode.end(), '\r', ' ');
 
 			XSParseExpression(processedCode.c_str(), &ast); // Build the AST tree.
 
@@ -1308,15 +1406,26 @@ namespace XSR
 			return true;
 		}
 		catch(const ParseExcept& e) {
-			if(e.errorLoc.isValid())
+
+			const LineMarker* const errorLocation = ast.findLineMarker(e.errorLoc.line);
+
+			const int errorLine = (errorLocation != nullptr) 
+				? errorLocation->targetLine + e.errorLoc.line - errorLocation->sourceLine
+				: e.errorLoc.line;
+
+			const char* const errorFile = (errorLocation != nullptr)
+				? errorLocation->filename.c_str()
+				: ""; // [TODO] Add a default filename.
+
+			if(errorLine >= 0)
 			{
 				char errorString[1024] = {0};
-				sprintf(errorString, "\n[XSR] error: @(%d) %s", e.errorLoc.line, e.what());
+				sprintf(errorString, "\nError(%s, %d): %s", errorFile, errorLine, e.what());
 				compilationErrors += errorString;
 			}
 			else
 			{
-				compilationErrors += std::string("\n[XSR] error: ") + e.what();
+				compilationErrors += std::string("\nError(NA) error: ") + e.what();
 			}
 			return false;
 		}
