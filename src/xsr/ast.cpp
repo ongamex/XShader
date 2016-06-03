@@ -78,7 +78,8 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 		{
 			for(auto ch : member) {
 				if(ch != 'x' && ch != 'y' && ch != 'z' && ch != 'w') {
-					throw ParseExcept(Location(), "Trying to reference unexisting member: " + member);
+					// Unexisting member.
+					return TypeDesc();
 				}
 			}
 
@@ -99,7 +100,8 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 		}
 	}
 
-	throw ParseExcept(Location(), "Unknown member access: " + member);
+	// Unexisting member.
+	return TypeDesc();
 }
 
 std::string TypeDesc::GetTypeAsString(const LangSettings& lang, const bool omitArraySize) const 
@@ -437,6 +439,11 @@ TypeDesc ExprMemberAccess::Internal_DeduceType(Ast* ast)
 {
 	if(resolvedType == TypeDesc())
 	resolvedType = TypeDesc::GetMemberType(expr->DeduceType(ast), member);
+
+	if(resolvedType == Type_Undeduced){
+		throw ParseExcept(location, "Unknown member access: " + member);
+	}
+
 	return resolvedType;
 
 }
@@ -787,6 +794,10 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 	{
 		const std::string typeName = TypeDesc::GetXShaderTypeName((Type)t);
 		
+		if(typeName.empty()){
+				throw ParseExcept(location, "A unnamed type found!");
+			}
+
 		if(fnName == typeName) 
 		{
 			resolvedType = TypeDesc((Type)t);
