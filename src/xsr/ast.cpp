@@ -19,8 +19,10 @@ namespace
 //-----------------------------------------------------------------------
 //TypeDesc
 //-----------------------------------------------------------------------
-TypeDesc::TypeDesc(std::string strType, int arraySize)
+TypeDesc::TypeDesc(const bool isConst, std::string strType, int arraySize) :
+	TypeDesc()
 {
+	m_isConst = isConst;
 	m_strType = strType;
 	SetArraySize(0, arraySize);
 
@@ -73,29 +75,28 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 
 	if(isFloatVectorType || isIntVectorType)
 	{
-		// Check if this is a swizzle.
+		// Check if this is a vector type swizzle.
 		if(member.size() <= 4)
 		{
 			for(auto ch : member) {
 				if(ch != 'x' && ch != 'y' && ch != 'z' && ch != 'w') {
-					// Unexisting member.
-					return TypeDesc();
+					return TypeDesc(); // Unexisting member.
 				}
 			}
 
 			if(isFloatVectorType)
 			{
-				if(member.size() == 1) return TypeDesc(Type_float);
-				if(member.size() == 2) return TypeDesc(Type_vec2f);
-				if(member.size() == 3) return TypeDesc(Type_vec3f);
-				if(member.size() == 4) return TypeDesc(Type_vec4f);
+				if(member.size() == 1) return TypeDesc(parent.IsConst(), Type_float);
+				if(member.size() == 2) return TypeDesc(parent.IsConst(), Type_vec2f);
+				if(member.size() == 3) return TypeDesc(parent.IsConst(), Type_vec3f);
+				if(member.size() == 4) return TypeDesc(parent.IsConst(), Type_vec4f);
 			}
 			else
 			{
-				if(member.size() == 1) return TypeDesc(Type_int);
-				if(member.size() == 2) return TypeDesc(Type_vec2i);
-				if(member.size() == 3) return TypeDesc(Type_vec3i);
-				if(member.size() == 4) return TypeDesc(Type_vec4i);
+				if(member.size() == 1) return TypeDesc(parent.IsConst(), Type_int);
+				if(member.size() == 2) return TypeDesc(parent.IsConst(), Type_vec2i);
+				if(member.size() == 3) return TypeDesc(parent.IsConst(), Type_vec3i);
+				if(member.size() == 4) return TypeDesc(parent.IsConst(), Type_vec4i);
 			}
 		}
 	}
@@ -106,7 +107,12 @@ TypeDesc TypeDesc::GetMemberType(const TypeDesc& parent, const std::string& memb
 
 std::string TypeDesc::GetTypeAsString(const LangSettings& lang, const bool omitArraySize) const 
 {
+	XSR_ASSERT(IsUndeduced() == false);
+	
 	std::string retval;
+
+	if(IsConst()) retval += "const ";
+
 	if(GetBuiltInType() == Type_void) retval = "void";
 	else if(GetBuiltInType() == Type_int) retval = "int";
 	else if(GetBuiltInType() == Type_float) retval = "float";
@@ -123,10 +129,7 @@ std::string TypeDesc::GetTypeAsString(const LangSettings& lang, const bool omitA
 		retval = m_strType;
 	}
 
-	if(omitArraySize == false)
-	{
-		retval += GetArraySuffixString();
-	}
+	if(omitArraySize == false) retval += GetArraySuffixString();
 
 	return retval;
 }
@@ -259,6 +262,8 @@ const LineMarker* Ast::findLineMarker(const int sourceLine)
 
 const Ast::FullVariableDesc* Ast::declareVariable(const TypeDesc& td, const std::string& name, VarTrait trait)
 {
+	XSR_ASSERT(td.IsUndeduced() == false);
+
 	FullVariableDesc fvd;
 
 	for(auto s : scope) fvd.fullName += s + "::";
@@ -280,7 +285,7 @@ const Ast::FullVariableDesc* Ast::declareVariable(const TypeDesc& td, const std:
 	return &declaredVariables.back();
 }
 
-const Ast::FullVariableDesc* Ast::findVarInCurrentScope(const std::string& name)
+const Ast::FullVariableDesc* Ast::findVarInCurrentScope(const std::string& name, const Location& location)
 {
 	// Search through all declared variables.
 	int depth = scope.size();
@@ -292,29 +297,32 @@ const Ast::FullVariableDesc* Ast::findVarInCurrentScope(const std::string& name)
 		for(int t = 0; t < depth; ++t) fullName+= scope[t] + "::";
 		fullName += name;
 
-		for(Ast::FullVariableDesc& v : declaredVariables)
+		for(Ast::FullVariableDesc& fvd : declaredVariables)
 		{
-			if(v.fullName == fullName) {
+			if(fvd.fullName == fullName) {
 
 				// Check if this is a "keyword variable".
-				// Mark the variable as "mantioned", meaning that this variable needs a special declaration in the output code(usually(maybe only) stage specific variables).
-				
-				const bool isKeywordVar = v.trait == VarTrait_StageSpecificInput || v.trait == VarTrait_StageSpecificOutput;
+				// Mark the variable as "mentioned", meaning that this variable needs a special declaration in the output code(usually(maybe only) stage specific variables).
+				const bool isKeywordVar = fvd.trait == VarTrait_StageSpecificInput || fvd.trait == VarTrait_StageSpecificOutput;
 			
 				if(isKeywordVar) {
 					const bool varFound = 
-						end(keywordVariablesMentioned) == std::find(begin(keywordVariablesMentioned), end(keywordVariablesMentioned), &v);
-					if(varFound) keywordVariablesMentioned.push_back(&v);
+						end(keywordVariablesMentioned) == std::find(begin(keywordVariablesMentioned), end(keywordVariablesMentioned), &fvd);
+					
+					if(varFound)
+					{
+						keywordVariablesMentioned.push_back(&fvd);
+					}
 				}
 
-				return &v;
+				return &fvd;
 			}
 		}
 
 		depth--;
 	}
 
-	throw ParseExcept(Location(), "Referenced an undefined variable: " + name);
+	throw ParseExcept(location, "Referenced an undefined variable: " + name);
 }
 
 const Ast::FullFuncionDesc& Ast::findFuncDecl(const std::string& name)
@@ -340,22 +348,6 @@ void Node::Declare(Ast* ast)
 	if(inBlock) ast->declPushScope();
 	Internal_Declare(ast);
 	if(inBlock) ast->declPopScope();
-}
-
-//-----------------------------------------------------------------------
-//
-//-----------------------------------------------------------------------
-TypeDesc TypeDeclNode::Internal_DeduceType(Ast* ast)
-{
-	if(resolvedType == Type_Undeduced) {
-		resolvedType = TypeDesc(typeAsString, 0);
-
-		for(int iElem=0; iElem < arraySizes.size(); iElem++){
-			resolvedType.SetArraySize(iElem, arraySizes[iElem]);
-		}
-	}
-
-	return resolvedType;
 }
 
 //-----------------------------------------------------------------------
@@ -413,7 +405,7 @@ void Ident::Internal_Declare(Ast* ast)
 	// [TODO] This is just a mistake...
 	// Deduce the type during the declaration. This is esier becase we already know the current scope.
 	// The correct solution would be to cache the current scope and deduce the type into the "type deduction" pass.
-	resolvedFvd = ast->findVarInCurrentScope(identifier);
+	resolvedFvd = ast->findVarInCurrentScope(identifier, location);
 }
 
 TypeDesc Ident::Internal_DeduceType(Ast* ast)
@@ -437,15 +429,15 @@ void ExprMemberAccess::Internal_Declare(Ast* ast)
 
 TypeDesc ExprMemberAccess::Internal_DeduceType(Ast* ast)
 {
-	if(resolvedType == TypeDesc())
-	resolvedType = TypeDesc::GetMemberType(expr->DeduceType(ast), member);
+	if(resolvedType.IsUndeduced()){
+		resolvedType = TypeDesc::GetMemberType(expr->DeduceType(ast), member);
 
-	if(resolvedType == Type_Undeduced){
-		throw ParseExcept(location, "Unknown member access: " + member);
+		if(resolvedType.IsUndeduced()){
+			throw ParseExcept(location, "Unknown member access: " + member);
+		}
 	}
 
 	return resolvedType;
-
 }
 
 //-----------------------------------------------------------------------
@@ -502,7 +494,7 @@ void ExprBin::Internal_Declare(Ast* ast)
 TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 {
 	// Check if the type has been already resolved
-	if(resolvedType != Type_Undeduced) {
+	if(resolvedType.IsUndeduced()==false) {
 		return resolvedType;
 	}
 
@@ -510,8 +502,9 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 	const auto lt = left->DeduceType(ast);
 	const auto rt = right->DeduceType(ast);
 
+	// [CAUTION]
 	if(lt.IsArray() || rt.IsArray()){
-		throw ParseExcept(location, "Binary operations between arrays are not supported!");
+		throw ParseExcept(location, "Binary operations between arrays do not exist.");
 	}
 
 	// Just a helper function...
@@ -526,41 +519,49 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 		case EBT_Add : 
 		case EBT_Sub :
 		{
-			if(lt != rt) 
-				throw ParseExcept(location, "+/- operator called with mixed types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
-		
+			if(lt.IsSame(rt, false) == false){
+				const std::string leftType = TypeDesc::GetXShaderTypeName(lt.GetBuiltInType());
+				const std::string rightType = TypeDesc::GetXShaderTypeName(rt.GetBuiltInType());
+				throw ParseExcept(location,"operator+/- called with mixed types: "+leftType+" and "+rightType+".");
+			}
+
 			resolvedType = lt;
 			break;
 		}
 
 		case EBT_Mul : 
 		{
-			if(lt == rt)                              resolvedType = lt;
-			else if(isPairOf(Type_int, Type_float))   resolvedType = TypeDesc(Type_float);
-			else if(isPairOf(Type_float, Type_vec2f)) resolvedType = TypeDesc(Type_vec2f);
-			else if(isPairOf(Type_float, Type_vec3f)) resolvedType = TypeDesc(Type_vec3f);
-			else if(isPairOf(Type_float, Type_vec4f)) resolvedType = TypeDesc(Type_vec4f);
-			else if(isPairOf(Type_mat4f, Type_vec4f)) resolvedType = TypeDesc(Type_vec4f);
-			else if(isPairOf(Type_mat4f, Type_float)) resolvedType = TypeDesc(Type_mat4f);
-			else if(isPairOf(Type_mat4f, Type_mat4f)) resolvedType = TypeDesc(Type_mat4f);
-			else if(isPairOf(Type_mat4f, Type_int))   resolvedType = TypeDesc(Type_mat4f);
+			if(lt.IsSame(rt, false))                  resolvedType = lt;
+			else if(isPairOf(Type_int, Type_float))   resolvedType = TypeDesc(true, Type_float);
+			else if(isPairOf(Type_float, Type_vec2f)) resolvedType = TypeDesc(true, Type_vec2f);
+			else if(isPairOf(Type_float, Type_vec3f)) resolvedType = TypeDesc(true, Type_vec3f);
+			else if(isPairOf(Type_float, Type_vec4f)) resolvedType = TypeDesc(true, Type_vec4f);
+			else if(isPairOf(Type_mat4f, Type_vec4f)) resolvedType = TypeDesc(true, Type_vec4f);
+			else if(isPairOf(Type_mat4f, Type_float)) resolvedType = TypeDesc(true, Type_mat4f);
+			else if(isPairOf(Type_mat4f, Type_mat4f)) resolvedType = TypeDesc(true, Type_mat4f);
+			else if(isPairOf(Type_mat4f, Type_int))   resolvedType = TypeDesc(true, Type_mat4f);
 			
 			// The type should be deduced by now, if not this is an error.
-			if(resolvedType == Type_Undeduced){
-				throw ParseExcept(location, "* operator called with incompatible types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
+			if(resolvedType.IsUndeduced()){
+				const std::string leftType = TypeDesc::GetXShaderTypeName(lt.GetBuiltInType());
+				const std::string rightType = TypeDesc::GetXShaderTypeName(rt.GetBuiltInType());
+				throw ParseExcept(location, "operator* called with incompatible types: "+leftType+" and "+rightType+".");
 			}
-
 			break;
 		}
 		
 		case EBT_Div :
 		{
-			if(isPairOf(Type_float, Type_float)) resolvedType = TypeDesc(Type_float);
-			else if(isPairOf(Type_int, Type_int)) resolvedType = TypeDesc(Type_int);
+			if(isPairOf(Type_float, Type_float)) resolvedType = TypeDesc(true, Type_float);
+			else if(isPairOf(Type_int, Type_int)) resolvedType = TypeDesc(true, Type_int);
 
 			// The type should be deduced by now, if not this is an error.
-			if(resolvedType == Type_Undeduced)
-				throw ParseExcept(location, "/ operator called with incompatible types: " + TypeDesc::GetXShaderTypeName(lt.GetBuiltInType()) + " " + TypeDesc::GetXShaderTypeName(rt.GetBuiltInType()));
+			if(resolvedType.IsUndeduced()){
+				const std::string leftType = TypeDesc::GetXShaderTypeName(lt.GetBuiltInType());
+				const std::string rightType = TypeDesc::GetXShaderTypeName(rt.GetBuiltInType());
+
+				throw ParseExcept(location, "operator/ called with incompatible types: "+leftType+" and "+rightType+".");
+			}
 			break;
 		}
 		
@@ -574,14 +575,17 @@ TypeDesc ExprBin::Internal_DeduceType(Ast* ast)
 		case EBT_Or :
 		case EBT_And :
 		{
-			resolvedType = TypeDesc(Type_bool);
+			resolvedType = TypeDesc(true, Type_bool);
 			break;
 		}
 		default :
-			throw ParseExcept(location, "Unknown binary expression type!");
+			throw ParseExcept(location, "Unknown binary expression.");
 	}
 
-	if(resolvedType == Type_Undeduced) throw("ExprBin type deduction failed");
+	if(resolvedType.IsUndeduced())
+	{
+		throw ParseExcept(location, "Failed to deduce the binary experssion type.");
+	}
 
 	return resolvedType;
 }
@@ -601,14 +605,17 @@ void ExprIndexing::Internal_Declare(Ast* ast)
 
 TypeDesc ExprIndexing::Internal_DeduceType(Ast* ast)
 {
-	if(resolvedType != Type_Undeduced) return resolvedType;
+	if(resolvedType.IsUndeduced()==false) {
+		return resolvedType;
+	}
 
 	TypeDesc exprType = expr->DeduceType(ast);
 	if(exprType.IsArray() == false) {
-		throw ParseExcept(location, "[] Indexing works only on arrays!");
+		// [TODO] Write the actual type name.
+		throw ParseExcept(location, "operator[] is not defined for non array types.");
 	}
 
-	// Shrink the type by one level.
+	// Shrink the type array levels by one.
 	resolvedType = exprType;
 	resolvedType.SetArraySize(resolvedType.GetArrayLevelsCount()-1, 0);
 
@@ -633,12 +640,11 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 		const TypeDesc textureType = args[0]->DeduceType(ast);
 		const TypeDesc samplingCoordType = args[1]->DeduceType(ast);
 
-		if(textureType==Type_Texture2D && samplingCoordType!=Type_vec2f)
-		{
+		if(textureType.IsSame(Type_Texture2D, false) && samplingCoordType.IsSame(Type_vec2f, false)==false) {
 			throw ParseExcept(location, "Invalid call to takeSample(Texture2D texture, vec2f samplingUV).");
 		}
-		else if(textureType==Type_TextureCube && samplingCoordType!=Type_vec3f)
-		{
+
+		if(textureType.IsSame(Type_TextureCube, false) && samplingCoordType.IsSame(Type_vec3f, false)==false) {
 			throw ParseExcept(location, "Invalid call to takeSample(TextureCube texture, vec3f samplingNormal).");
 		}
 
@@ -653,13 +659,19 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 		}
 		else if(ast->OutLangIs(OL_GLSL))
 		{
-			if(textureType == Type_Texture2D) return "texture2D(" + textureCode + "," + samplingPtCode + ")";
-			if(textureType == Type_TextureCube) return "textureCube(" + textureCode + "," + samplingPtCode + ")";
-			else throw ParseExcept(location, "takeSample is not implemented for this type!");
+			if(textureType.IsSame(Type_Texture2D, false)) return "texture2D(" + textureCode + "," + samplingPtCode + ")";
+			else if(textureType.IsSame(Type_TextureCube, false)) return "textureCube(" + textureCode + "," + samplingPtCode + ")";
+			else
+			{
+				// [TODO] write the actual typename.
+				throw ParseExcept(location, "takeSample is not implemented for this type.");
+			}
 		}
 		else
 		{
-			throw ParseExcept(location, "Unvalid code path in FuncCall::Internal_GenerateCode.");
+			// Should never happen.
+			XSR_ASSERT(false);
+			throw ParseExcept(location, "Invalid code path in FuncCall::Internal_GenerateCode.");
 		}
 	}
 	
@@ -684,18 +696,18 @@ std::string FuncCall::Internal_GenerateCode(Ast* ast)
 		
 			if(fnName == typeName) 
 			{
-				TypeDesc type((Type)t);
+				TypeDesc type(false, (Type)t);
 				//Assert(type.GetArraySize() == 0); //[TODO] Arrays if possible.
 				callFnName = type.GetTypeAsString(ast->lang, true);
 				break;
 			}
 		}
 
-		// Both hlsl and glsl lerp/mix functions are supported.
+		// Both HLSL and GLSL lerp/mix functions are supported.
 		if(ast->OutLangIs(OL_HLSL) && fnName == "mix") callFnName = "lerp";
 		if(ast->OutLangIs(OL_GLSL) && fnName == "lerp") callFnName = "mix";
 	
-		// If this is just a regular fn call.
+		// If this is just a regular function call.
 		if(callFnName.empty()) {
 			callFnName = fnName;
 		}
@@ -720,7 +732,9 @@ void FuncCall::Internal_Declare(Ast* ast)
 
 TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 {
-	if(resolvedType != Type_Undeduced) return resolvedType;
+	if(resolvedType.IsUndeduced()==false){
+		return resolvedType;
+	}
 
 	// [HARDCODED]
 	// Function calls type deduction has special behavior for some specific functions that is hardcoded here.
@@ -729,30 +743,47 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 	// linear interpolation support both hlsl "lerp" and glsl "mix".
 	if(fnName == "lerp" || fnName == "mix" || fnName == "clamp" || fnName == "smoothstep")
 	{
-		if(args.size() != 3) throw ParseExcept(location, "lerp/mix/clamp called with wrong arg count(should be 3: x a,b)");
+		if(args.size() != 3)
+		{
+			throw ParseExcept(location, "Invalid call to "+fnName+"(T a, T b, float t)");
+		}
 
-		if(args[0]->DeduceType(ast) != args[1]->DeduceType(ast)) throw ParseExcept(location, "lerp mixed arguments type");
-		if(args[2]->DeduceType(ast) != Type_float) throw ParseExcept(location, "lerp interpolation coeff isn't a float!"); // the interpolation coeff must be a float.
+		// Check if the reference types are the same.
+		if(args[0]->DeduceType(ast).IsSame(args[1]->DeduceType(ast), false)==false)
+		{
+			throw ParseExcept(location, "Invalid call to "+fnName+"(T a, T b, float t)");
+		}
+
+		// Check if the interpolation coefficient is a float.
+		if(args[2]->DeduceType(ast).IsSame(Type_float, false)==false)
+		{
+			throw ParseExcept(location, fnName+" interpolation coefficient isn't a float!"); // the interpolation coeff must be a float.
+		}
 
 		resolvedType = args[1]->DeduceType(ast);
 	}
 
 	if(fnName == "dot")
 	{
-		if(args.size() != 2) throw ParseExcept(location, "dot must be called with exactly one argument.");
+		if(args.size() != 2){
+			throw ParseExcept(location, "Invalid call to dot(vec*, vec*).");
+		}
 
 		const TypeDesc& td0 = args[0]->DeduceType(ast);
 		const TypeDesc& td1 = args[1]->DeduceType(ast);
 
-		if(td0 != td1) throw ParseExcept(location, "dot called with mixed arguments."); 
-
-		if(td0 == Type_vec2f || td0 == Type_vec3f || td0 == Type_vec4f)
+		if(td0.IsSame(td1, false) == false)
 		{
-			resolvedType = Type_float;
+			throw ParseExcept(location, "dot(vec*, vec*) called with mixed argument types."); 
+		}
+
+		if(td0.IsSame(Type_vec2f, false) || td0.IsSame(Type_vec3f, false) || td0.IsSame(Type_vec4f, false))
+		{
+			resolvedType = TypeDesc(true, Type_float);
 		}
 		else
 		{
-			throw ParseExcept(location, "dot called with unknown argument type");
+			throw ParseExcept(location, "dot(vec*, vec*) with non floating point vector type. [TODO] Fix this!");
 		}
 	}
 
@@ -761,10 +792,13 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 		const TypeDesc& td0 = args[0]->DeduceType(ast);
 		const TypeDesc& td1 = args[1]->DeduceType(ast);
 
-		if(td0 != Type_vec3f) throw ParseExcept(location, "cross is avaiabled only for vec3f class."); 
-		if(td0 != td1) throw ParseExcept(location, "cross called with mixed arguments."); 
+		// Check if both types are vec3f.
+		if(td0.IsSame(Type_vec3f,false) && td1.IsSame(Type_vec3f,false))
+		{
+			throw ParseExcept(location, "Invalid call to cross(vec3f a, vec3f b)");
+		}
 
-		resolvedType = Type_vec3f;
+		resolvedType = TypeDesc(true, Type_vec3f);
 	}
 
 	if(fnName == "normalize")
@@ -772,41 +806,46 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 		if(args.size() != 1) throw ParseExcept(location, "normalize must be called with exactly one argument.");
 
 		const TypeDesc& td = args[0]->DeduceType(ast);
-		if(td == Type_vec2f || td == Type_vec3f || td == Type_vec4f)
+		if(td.IsSame(Type_vec2f, false) || td.IsSame(Type_vec3f, false) || td.IsSame(Type_vec4f, false))
 		{
 			resolvedType = td;
 		}
 		else
 		{
-			throw ParseExcept(location, "normalize isnt't defined for this type!");
+			throw ParseExcept(location, "Invalid call to normalize(vec*f)");
 		}
 	}
 
 	if(fnName == "transpose")
 	{
-		if(args.size() != 1) throw ParseExcept(location, "transpose must be called with exactly one argument.");
+		if(args.size() != 1) {
+			throw ParseExcept(location, "transpose must be called with exactly one argument.");
+		}
+
 		resolvedType = args[0]->DeduceType(ast);
 	}
 
 	// Check if this is a type constructor.
-	if(resolvedType == Type_Undeduced)
-	for(int t = Type_BuiltInTypeBegin + 1; t < Type_BuiltInTypeEnd; ++t)
+	if(resolvedType.IsUndeduced())
 	{
-		const std::string typeName = TypeDesc::GetXShaderTypeName((Type)t);
-		
-		if(typeName.empty()){
-				throw ParseExcept(location, "A unnamed type found!");
-			}
-
-		if(fnName == typeName) 
+		for(int t = Type_BuiltInTypeBegin + 1; t < Type_BuiltInTypeEnd; ++t)
 		{
-			resolvedType = TypeDesc((Type)t);
-			break;
+			const std::string typeName = TypeDesc::GetXShaderTypeName((Type)t);
+		
+			if(typeName.empty()){
+					throw ParseExcept(location, "A unnamed type found!");
+				}
+
+			if(fnName == typeName) 
+			{
+				resolvedType = TypeDesc(true, (Type)t);
+				break;
+			}
 		}
 	}
 
 	// Just a regualr function call.
-	if(resolvedType == Type_Undeduced)
+	if(resolvedType.IsUndeduced())
 	{	
 		resolvedType = ast->findFuncDecl(fnName).retType;
 	}
@@ -841,7 +880,7 @@ std::string ExprLiteral::Internal_GenerateCode(Ast* ast)
 		return buff;
 	}
 
-	throw ParseExcept(location, "Unknown literal type");
+	throw ParseExcept(location, "Unknown literal type.");
 }
 
 TypeDesc ExprLiteral::Internal_DeduceType(Ast* ast) 
@@ -854,7 +893,7 @@ TypeDesc ExprLiteral::Internal_DeduceType(Ast* ast)
 //------------------------------------------------------------------------------
 TypeDesc ExprBlock::Internal_DeduceType(Ast* ast)
 {
-	if(resolvedType == Type_Undeduced)
+	if(resolvedType.IsUndeduced())
 	{
 		if(exprs.size() == 0) {
 			throw ParseExcept(location, "Invalid ExprBlock. No expressions are specified");
@@ -864,7 +903,7 @@ TypeDesc ExprBlock::Internal_DeduceType(Ast* ast)
 		resolvedType = exprs[0]->DeduceType(ast);
 		for(int t = 1; t < exprs.size(); ++t)
 		{
-			if(resolvedType != exprs[t]->DeduceType(ast))
+			if(resolvedType.IsSame(exprs[t]->DeduceType(ast), false))
 			{
 				throw ParseExcept(location, "Mixed types in ExprBlock");
 			}
@@ -1068,7 +1107,7 @@ std::string VarDecl::Internal_GenerateCode(Ast* ast)
 {
 	std::string retval;
 
-	const TypeDesc type = typeNode->DeduceType(ast);
+	const TypeDesc type = typeNode->resolvedType;
 
 	if(type.IsArray() == false)
 	{
@@ -1181,7 +1220,9 @@ std::string FuncDecl::GenerateMainFuncHLSL(Ast* ast)
 		// Stage specific output with SV_*.
 		for(const auto& var : ast->keywordVariablesMentioned) {
 			if(var->trait == VarTrait_StageSpecificOutput)
-			retval += var->type.GetTypeAsString(ast->lang, true) + " " + var->fullName + " : " + var->hlslSemantic + ";";
+			{
+				retval += var->type.GetTypeAsString(ast->lang, true) + " " + var->fullName + " : " + var->hlslSemantic + ";";
+			}
 		}
 
 		retval += "};";
@@ -1291,7 +1332,7 @@ namespace XSR
 			XSParseExpression(processedCode.c_str(), &ast); // Build the AST tree.
 
 			if(!ast.program) {
-				throw ParseExcept(Location(), ast.bisonParseError.empty() ? "Failed while compiling program!" : ast.bisonParseError);
+				throw ParseExcept(ast.bisonParseErrorLocation, ast.bisonParseError.empty() ? "Failed while compiling program!" : ast.bisonParseError);
 			}
 
 			// Declare the predefined functions for the language.
@@ -1307,25 +1348,25 @@ namespace XSR
 
 				// For hlsl trigonometric functions have vector type specializations, but for now lets pretend
 				// that there isn't.
-				ast.declareFunction(Type_float, "sin");
-				ast.declareFunction(Type_float, "cos");
-				ast.declareFunction(Type_float, "tan");
-				ast.declareFunction(Type_float, "tan2");
+				ast.declareFunction(TypeDesc(true, Type_float), "sin");
+				ast.declareFunction(TypeDesc(true, Type_float), "cos");
+				ast.declareFunction(TypeDesc(true, Type_float), "tan");
+				ast.declareFunction(TypeDesc(true, Type_float), "tan2");
 
-				ast.declareFunction(Type_float, "asin");
-				ast.declareFunction(Type_float, "acos");
-				ast.declareFunction(Type_float, "atan");
+				ast.declareFunction(TypeDesc(true, Type_float), "asin");
+				ast.declareFunction(TypeDesc(true, Type_float), "acos");
+				ast.declareFunction(TypeDesc(true, Type_float), "atan");
 
-				ast.declareFunction(Type_float, "sincos");
+				ast.declareFunction(TypeDesc(true, Type_float), "sincos");
 
-				ast.declareFunction(Type_float, "sqrt");
-				ast.declareFunction(Type_float, "rsqrt");
+				ast.declareFunction(TypeDesc(true, Type_float), "sqrt");
+				ast.declareFunction(TypeDesc(true, Type_float), "rsqrt");
 
 				// Texture sampling
-				ast.declareFunction(Type_vec4f, "takeSample");
+				ast.declareFunction(TypeDesc(true, Type_vec4f), "takeSample");
 
 				// Pixel shader discard statement. We define it as a function.
-				ast.declareFunction(Type_void, "discard");
+				ast.declareFunction(TypeDesc(true, Type_void), "discard");
 			}
 
 			// Declare the vertex attributes, io varyings, and uniforms.
@@ -1336,12 +1377,12 @@ namespace XSR
 				// There is a "mentioned" list stored in the AST that holds a list of mentioned variables in the user's code.
 				{
 					// Vertex shader outputs
-					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_VertexOut", TypeDesc(Type_vec4f), VarTrait_StageSpecificOutput, "SV_Position", "gl_Position"));
-					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_VertexID", TypeDesc(Type_int), VarTrait_StageSpecificInput, "SV_VertexID", "gl_VertexID"));
+					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_VertexOut", TypeDesc(false, Type_vec4f), VarTrait_StageSpecificOutput, "SV_Position", "gl_Position"));
+					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_VertexID", TypeDesc(false, Type_int), VarTrait_StageSpecificInput, "SV_VertexID", "gl_VertexID"));
 
 					// Pixel shader output
-					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_PixelOut", TypeDesc(Type_vec4f), VarTrait_StageSpecificOutput,  "SV_Target", "gl_FragColor" ));
-					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_PixelNDC", TypeDesc(Type_vec4f), VarTrait_StageSpecificInput,  "SV_Position", "gl_FragCoord" ));
+					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_PixelOut", TypeDesc(false, Type_vec4f), VarTrait_StageSpecificOutput, "SV_Target", "gl_FragColor" ));
+					ast.declaredVariables.push_back(Ast::FullVariableDesc("xsr_PixelNDC", TypeDesc(false, Type_vec4f), VarTrait_StageSpecificInput, "SV_Position", "gl_FragCoord" ));
 				};
 
 				// Vertex Attributes.
@@ -1437,12 +1478,12 @@ namespace XSR
 			if(errorLine >= 0)
 			{
 				char errorString[1024] = {0};
-				sprintf(errorString, "\nError(%s, %d): %s", errorFile, errorLine, e.what());
+				sprintf(errorString, "\n%s(%d): error: %s", errorFile, errorLine, e.what());
 				compilationErrors += errorString;
 			}
 			else
 			{
-				compilationErrors += std::string("\nError(NA) error: ") + e.what();
+				compilationErrors += std::string("\n%s(??): error: %s") + e.what();
 			}
 			return false;
 		}

@@ -14,8 +14,9 @@ struct Ast;
 
 struct Location
 {
-	Location() :
-		line(-1), column(-1)
+	Location(const int line = -1, const int column = -1) :
+		line(line),
+		column(column)
 	{}
 
 	bool isValid() const {
@@ -36,6 +37,10 @@ struct ParseExcept : public std::exception {
 		errorLoc(errorLoc),
 		msg(msg)
 	{}
+
+	const char* what() const override {
+		return msg.c_str();
+	}
 
 	Location errorLoc;
 	std::string msg;
@@ -92,8 +97,17 @@ public :
 	
 public :
 
-	TypeDesc(Type type = Type_Undeduced, int arraySize = 0) : m_type(type), m_arraySize(arraySize) {}
-	explicit TypeDesc(std::string strType, int arraySize = 0);
+	TypeDesc() :
+		TypeDesc(false, Type_Undeduced, 0)
+	{}
+
+	TypeDesc(const bool isConst, Type type, int arraySize = 0) : 
+		m_isConst(isConst),
+		m_type(type), 
+		m_arraySize(arraySize)
+	{}
+	
+	explicit TypeDesc(const bool isConst, std::string strType, int arraySize = 0);
 
 	bool IsArray() const { return m_arraySize.size() != 0; }
 	
@@ -106,6 +120,7 @@ public :
 		return m_arraySize.at(level);
 	
 	}
+
 	void SetArraySize(const int level, const int arraySize) {
 		
 		// In order to simplify code generation ignore calls with level < 0.
@@ -124,7 +139,7 @@ public :
 			m_arraySize.resize(level+1);
 		}
 
-		// if the array size is 0, that means that we should cut off that array size (all behind it).
+		// If the array size is 0, that means that we should cut off that array size (all behind it).
 		// If does not make sense to have  float[0][2] does it.
 		// Addionally assert is if we are cutting something different form the last level.
 		// [TODO] a bit more error checking ???
@@ -139,33 +154,56 @@ public :
 		}
 	}
 
-	bool operator==(const Type type) const { return type == m_type && (IsArray() == false); }
-	bool operator!=(const Type type) const { return !(*this == type); }
+	void AddArrayLevel(const int arraySize)	{
+		SetArraySize(GetArrayLevelsCount(), arraySize);
+	}
 
-	bool operator==(const TypeDesc& other) const {
+	bool IsUndeduced() const {
+		return m_type == Type_Undeduced;
+	}
+
+	bool IsSame(const TypeDesc& ref, const bool doConstwiseComparison) const {
+		if(doConstwiseComparison)
+		{
+			// check if both are const.
+			if(IsConst() != ref.IsConst())
+			{
+				return false;
+			}
+		}
 
 		// Check if both types are arrays or not.
-		if(GetArrayLevelsCount() != other.GetArrayLevelsCount()){
+		if(GetArrayLevelsCount() != ref.GetArrayLevelsCount()){
 			return false;
 		}
 
 		for(int iLevel = 0; iLevel < GetArrayLevelsCount(); ++iLevel){
-			if(GetArraySize(iLevel) != other.GetArraySize(iLevel)){
+			if(GetArraySize(iLevel) != ref.GetArraySize(iLevel)){
 				return false;
 			}
 		}
 		
 		// Check if the data type is the same.
-		if(m_type != Type_UserDefined) return m_type == other.m_type;
-		return m_strType == other.m_strType;
+		if(m_type != Type_UserDefined) return m_type == ref.m_type;
+		return m_strType == ref.m_strType;
 	}
 
-	bool operator!=(const TypeDesc& other) const { return !(*this == other); }
+	bool IsSame(const Type type, const bool doConstwiseComparison) const {
+		XSR_ASSERT(type != Type_UserDefined); // This check does not make any sense!
 
-	// Returns the type of parent::member.
+		if(doConstwiseComparison)
+		{
+			// Assumes that the input type is const by default.
+			if(IsConst() == false) return false;
+		}
+
+		return type == m_type && (IsArray() == false);
+	}
+
+	// Returns the type of amember variable.
 	static TypeDesc GetMemberType(const TypeDesc& parent, const std::string& member);
 	
-	// Returns 
+	// Returns typename as a string in the given langage.
 	std::string GetTypeAsString(const LangSettings& lang, const bool omitArraySize) const;
 	
 	// Returns the string that adds the array component of the type
@@ -174,12 +212,16 @@ public :
 	std::string ComposeVarDecl(const LangSettings& lang, const std::string& varName) const ;
 	
 	Type GetBuiltInType() const { return m_type; }
-private : 
 
+	bool IsConst() const { return m_isConst; }
+	void SetConst(const bool v) { m_isConst = v; }
+
+private :
+
+	bool m_isConst;
 	Type m_type = Type_Undeduced;
 	std::string m_strType;
 	std::vector<int> m_arraySize;
-	//int m_arraySize = 0; // 0 means that this is not an array.
 };
 
 // A so called line marker, that holds the data specified by "#line" directive.
@@ -275,9 +317,9 @@ public :
 
 private :
 
-	virtual std::string Internal_GenerateCode(Ast* ast) { return std::string(); }
+	virtual std::string Internal_GenerateCode(Ast* ast) { XSR_ASSERT(false); return std::string(); }
 	virtual void Internal_Declare(Ast* ast) { }
-	virtual TypeDesc Internal_DeduceType(Ast* ast) { return TypeDesc(); }
+	virtual TypeDesc Internal_DeduceType(Ast* ast) { XSR_ASSERT(false) ;return TypeDesc(); }
 
 public :
 
@@ -366,13 +408,14 @@ struct Ast
 	};
 
 	std::string bisonParseError;
+	Location bisonParseErrorLocation;
 
 	// Declares a variable at the current scope
 	const FullVariableDesc* declareVariable(const TypeDesc& td, const std::string& name,  VarTrait trait = VarTrait_Regular);
 	void declareFunction(const TypeDesc& returnType, const std::string& name);
 	
 	// Thorws ParseExcept if missing. 
-	const FullVariableDesc* findVarInCurrentScope(const std::string& name);
+	const FullVariableDesc* findVarInCurrentScope(const std::string& name, const Location& location);
 	const FullFuncionDesc& findFuncDecl(const std::string& name);
 
 	// A list of line markers, marking where the code below it was originally.
@@ -409,10 +452,10 @@ struct Ast
 struct TypeDeclNode : public Node
 {
 	TypeDeclNode() = default;
-	TypeDesc Internal_DeduceType(Ast* ast) override;
-
-	std::string typeAsString;
-	std::vector<int> arraySizes;
+	TypeDesc Internal_DeduceType(Ast* ast) override {
+		XSR_ASSERT(resolvedType.IsUndeduced()==false);
+		return resolvedType;
+	}
 
 	TypeDesc resolvedType;
 };
@@ -510,8 +553,8 @@ struct ExprLiteral : public Node
 	};
 
 	ExprLiteral() : type() {}
-	ExprLiteral(float f) : type("float"), float_val(f) {}
-	ExprLiteral(int i) : type("int"), int_val(i) {}
+	ExprLiteral(float f) : type(true, Type_float), float_val(f) {}
+	ExprLiteral(int i) : type(true, Type_int), int_val(i) {}
 
 	std::string Internal_GenerateCode(Ast* ast) override;
 	TypeDesc Internal_DeduceType(Ast* ast) override;

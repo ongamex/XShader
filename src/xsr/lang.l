@@ -17,8 +17,12 @@
 // I've added this because in some caes flex will call fwrite and some other stange function
 // causing casing a crash in non console application.
 #define ECHO do {} while(false)
-
-#define YY_USER_ACTION yylloc->first_line = yylloc->last_line = yylineno;
+	
+// This is used for token location tracking together with [\n] token
+#define YY_USER_ACTION do { yylloc->first_line = yylloc->last_line = yylineno; \
+                            yylloc->first_column = yycolumn; yylloc->last_column = yycolumn+yyleng-1; \
+                            yycolumn += yyleng; \
+                          } while(false);
 
 %}
 
@@ -26,6 +30,7 @@
 
 
 "//".*[\n]												;
+[\n]													{/* Match new line in order in increment the line number. [CAUTION] The internet says that I should set yycolumn = 0, but flex already does that for me.*/};
 "#line"[ ]+[1-9][0-9]*(.*)?								{ ast->addLineMarker(LineMarker(yylineno, yytext)); }
 "for"													return FOR;
 "if"													return IF;

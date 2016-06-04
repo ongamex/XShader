@@ -118,16 +118,16 @@ grammar_list :
 	// A genric type mentioning.
 	//-------------------------------------------------
 	type_node : 
-		 IDENT 				        { $$ = ast->push<TypeDeclNode>(toLocation(@1)); $$->As<TypeDeclNode>().typeAsString = $1; }
-		| type_node '[' NUM_INT ']' { $$ = $1; $$->As<TypeDeclNode>().arraySizes.push_back($3); }
+		 IDENT 				        { $$ = ast->push<TypeDeclNode>(toLocation(@1)); $$->As<TypeDeclNode>().resolvedType = TypeDesc(false, $1);}
+		| type_node '[' NUM_INT ']' { $$ = $1; $$->As<TypeDeclNode>().resolvedType.AddArrayLevel($3); }
 	
 	//-------------------------------------------------
 	// Global variables, uniforms, varyings, attributes
 	//-------------------------------------------------
 	
 shader_gvar_type : 
-		IDENT					{ $$ = TypeDesc($1); }
-	|	IDENT '[' NUM_INT ']'	{ $$ = TypeDesc($1, $3); }
+		IDENT					{ $$ = TypeDesc(false, $1); }
+	|	IDENT '[' NUM_INT ']'	{ $$ = TypeDesc(false, $1, $3); }
 		
 shader_globals : 
 		// These aren't real nodes for now in order to reduce comprexity...
@@ -143,14 +143,14 @@ shader_globals :
 	
 	// A single variable for function declarations.
 fndecl_vardecl_var : 
-		IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc($1), $2, nullptr, FNAT_In   ); }
-	|	IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc($1), $2, $4     , FNAT_In   ); }
-	|	IN IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc($2), $3, nullptr, FNAT_In	); }
-	|	IN IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc($2), $3, $5     , FNAT_In	); }
-	|	OUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc($2), $3, nullptr, FNAT_Out  ); }
-	|	OUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc($2), $3, $5     , FNAT_Out  ); }
-	|	INOUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc($2), $3, nullptr, FNAT_InOut); }
-	|	INOUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc($2), $3, $5     , FNAT_InOut); }
+		IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc(false, $1), $2, nullptr, FNAT_In   ); }
+	|	IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc(false, $1), $2, $4     , FNAT_In   ); }
+	|	IN IDENT IDENT 				{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc(false, $2), $3, nullptr, FNAT_In	); }
+	|	IN IDENT IDENT '=' expr		{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc(false, $2), $3, $5     , FNAT_In	); }
+	|	OUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc(false, $2), $3, nullptr, FNAT_Out  ); }
+	|	OUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc(false, $2), $3, $5     , FNAT_Out  ); }
+	|	INOUT IDENT IDENT 			{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc(false, $2), $3, nullptr, FNAT_InOut); }
+	|	INOUT IDENT IDENT '=' expr	{ $$ = ast->push<FnDeclArgVarDecl>(toLocation(@1), TypeDesc(false, $2), $3, $5     , FNAT_InOut); }
 	;
 	
 	// A list of variables for the function declaration.
@@ -169,7 +169,7 @@ fndecl_vardecl :
 function_decl : 
 	IDENT IDENT '(' fndecl_vardecl ')' '{' stmt_list '}'	{ 
 		auto& funcDecl = $4->As<FuncDecl>();
-		funcDecl.retType = TypeDesc($1);
+		funcDecl.retType = TypeDesc(false, $1);
 		funcDecl.name = $2;
 		funcDecl.stmt = $7;
 		$$ = $4;
@@ -298,7 +298,6 @@ expr_fncall :
 %%
 
 void yyerror(struct YYLTYPE* yyErrorLoc ,void* s,struct Ast* ast,char const* msg){
-	char temp[512];
-	snprintf(temp, sizeof(temp), "Error(line %d) %s", yyErrorLoc->first_line, msg);
-	ast->bisonParseError = temp;
+	ast->bisonParseError = msg;
+	ast->bisonParseErrorLocation = toLocation(*yyErrorLoc);
 }

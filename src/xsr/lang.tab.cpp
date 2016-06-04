@@ -1754,22 +1754,22 @@ yyreduce:
 
   case 7:
 
-    { (yyval.node) = ast->push<TypeDeclNode>(toLocation((yylsp[(1) - (1)]))); (yyval.node)->As<TypeDeclNode>().typeAsString = (yyvsp[(1) - (1)].str_val); }
+    { (yyval.node) = ast->push<TypeDeclNode>(toLocation((yylsp[(1) - (1)]))); (yyval.node)->As<TypeDeclNode>().resolvedType = TypeDesc(false, (yyvsp[(1) - (1)].str_val));}
     break;
 
   case 8:
 
-    { (yyval.node) = (yyvsp[(1) - (4)].node); (yyval.node)->As<TypeDeclNode>().arraySizes.push_back((yyvsp[(3) - (4)].int_val)); }
+    { (yyval.node) = (yyvsp[(1) - (4)].node); (yyval.node)->As<TypeDeclNode>().resolvedType.AddArrayLevel((yyvsp[(3) - (4)].int_val)); }
     break;
 
   case 9:
 
-    { (yyval.typeDesc) = TypeDesc((yyvsp[(1) - (1)].str_val)); }
+    { (yyval.typeDesc) = TypeDesc(false, (yyvsp[(1) - (1)].str_val)); }
     break;
 
   case 10:
 
-    { (yyval.typeDesc) = TypeDesc((yyvsp[(1) - (4)].str_val), (yyvsp[(3) - (4)].int_val)); }
+    { (yyval.typeDesc) = TypeDesc(false, (yyvsp[(1) - (4)].str_val), (yyvsp[(3) - (4)].int_val)); }
     break;
 
   case 11:
@@ -1794,42 +1794,42 @@ yyreduce:
 
   case 15:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (2)])), TypeDesc((yyvsp[(1) - (2)].str_val)), (yyvsp[(2) - (2)].str_val), nullptr, FNAT_In   ); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (2)])), TypeDesc(false, (yyvsp[(1) - (2)].str_val)), (yyvsp[(2) - (2)].str_val), nullptr, FNAT_In   ); }
     break;
 
   case 16:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (4)])), TypeDesc((yyvsp[(1) - (4)].str_val)), (yyvsp[(2) - (4)].str_val), (yyvsp[(4) - (4)].node)     , FNAT_In   ); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (4)])), TypeDesc(false, (yyvsp[(1) - (4)].str_val)), (yyvsp[(2) - (4)].str_val), (yyvsp[(4) - (4)].node)     , FNAT_In   ); }
     break;
 
   case 17:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (3)])), TypeDesc((yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_In	); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (3)])), TypeDesc(false, (yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_In	); }
     break;
 
   case 18:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (5)])), TypeDesc((yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_In	); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (5)])), TypeDesc(false, (yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_In	); }
     break;
 
   case 19:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (3)])), TypeDesc((yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_Out  ); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (3)])), TypeDesc(false, (yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_Out  ); }
     break;
 
   case 20:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (5)])), TypeDesc((yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_Out  ); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (5)])), TypeDesc(false, (yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_Out  ); }
     break;
 
   case 21:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (3)])), TypeDesc((yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_InOut); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (3)])), TypeDesc(false, (yyvsp[(2) - (3)].str_val)), (yyvsp[(3) - (3)].str_val), nullptr, FNAT_InOut); }
     break;
 
   case 22:
 
-    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (5)])), TypeDesc((yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_InOut); }
+    { (yyval.node) = ast->push<FnDeclArgVarDecl>(toLocation((yylsp[(1) - (5)])), TypeDesc(false, (yyvsp[(2) - (5)].str_val)), (yyvsp[(3) - (5)].str_val), (yyvsp[(5) - (5)].node)     , FNAT_InOut); }
     break;
 
   case 23:
@@ -1851,7 +1851,7 @@ yyreduce:
 
     { 
 		auto& funcDecl = (yyvsp[(4) - (8)].node)->As<FuncDecl>();
-		funcDecl.retType = TypeDesc((yyvsp[(1) - (8)].str_val));
+		funcDecl.retType = TypeDesc(false, (yyvsp[(1) - (8)].str_val));
 		funcDecl.name = (yyvsp[(2) - (8)].str_val);
 		funcDecl.stmt = (yyvsp[(7) - (8)].node);
 		(yyval.node) = (yyvsp[(4) - (8)].node);
@@ -2364,7 +2364,6 @@ yyreturn:
 
 
 void yyerror(struct YYLTYPE* yyErrorLoc ,void* s,struct Ast* ast,char const* msg){
-	char temp[512];
-	snprintf(temp, sizeof(temp), "Error(line %d) %s", yyErrorLoc->first_line, msg);
-	ast->bisonParseError = temp;
+	ast->bisonParseError = msg;
+	ast->bisonParseErrorLocation = toLocation(*yyErrorLoc);
 }
