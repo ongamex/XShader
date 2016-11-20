@@ -12,6 +12,8 @@ using namespace XSR;
 
 struct Ast;
 
+struct TypeDeclNode;
+
 struct Location
 {
 	Location(const int line = -1, const int column = -1) :
@@ -273,20 +275,36 @@ enum FnCallArgType
 
 struct VertexAttribs
 {
-	TypeDesc type;
+	VertexAttribs(TypeDeclNode* typeNode, std::string varName, std::string semantic)
+		: typeNode(typeNode)
+		, varName(varName)
+		, semantic(semantic)
+	{}
+
+	TypeDeclNode* typeNode = nullptr;
 	std::string varName;
 	std::string semantic;
 };
 
 struct Varyings
 {
-	TypeDesc type;
+	Varyings(TypeDeclNode* typeNode, std::string varName)
+		: typeNode(typeNode)
+		, varName(varName)
+	{}
+
+	TypeDeclNode* typeNode = nullptr;
 	std::string varName;
 };
 
 struct Uniforms
 {
-	TypeDesc type;
+	Uniforms(TypeDeclNode* typeNode, std::string varName)
+		: typeNode(typeNode)
+		, varName(varName)
+	{}
+
+	TypeDeclNode* typeNode = nullptr;
 	std::string varName;
 };
 

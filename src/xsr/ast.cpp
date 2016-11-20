@@ -1214,7 +1214,7 @@ std::string FuncDecl::GenerateMainFuncHLSL(Ast* ast)
 
 		// The user specified output varyings.
 		for(const auto& var : ast->stageOutputVaryings) {
-			retval += var.type.GetTypeAsString(ast->lang, true) + " " + var.varName + " : " + var.varName + ";";
+			retval += var.typeNode->DeduceType(ast).GetTypeAsString(ast->lang, true) + " " + var.varName + " : " + var.varName + ";";
 		}
 
 		// Stage specific output with SV_*.
@@ -1234,12 +1234,12 @@ std::string FuncDecl::GenerateMainFuncHLSL(Ast* ast)
 
 		// Vertex attributes input.
 		for(auto& attrib : ast->vertexAttribs) {
-			retval += attrib.type.ComposeVarDecl(ast->lang, attrib.varName) + " : " + attrib.semantic + ",";
+			retval += attrib.typeNode->DeduceType(ast).ComposeVarDecl(ast->lang, attrib.varName) + " : " + attrib.semantic + ",";
 		}
 
 		// Varyings input.
 		for(auto& var : ast->stageInputVaryings) {
-			retval += var.type.ComposeVarDecl(ast->lang, var.varName) + " : " + var.varName + ",";
+			retval += var.typeNode->DeduceType(ast).ComposeVarDecl(ast->lang, var.varName) + " : " + var.varName + ",";
 		}
 
 		// Stage specific input with SV_*.
@@ -1387,28 +1387,29 @@ namespace XSR
 
 				// Vertex Attributes.
 				// [TODO] Concider to declare these values as locals in main.
-				for(const auto& var : ast.vertexAttribs) {
-					ast.declareVariable(var.type, var.varName, VarTrait_VertexAttribute);
+				for(const VertexAttribs& var : ast.vertexAttribs)
+				{
+					ast.declareVariable(var.typeNode->DeduceType(&ast), var.varName, VarTrait_VertexAttribute);
 				}
 
 				// Input varyings. 
 				// [TODO] Concider to declare these values as locals in main.
-				for(const auto& var : ast.stageInputVaryings)
+				for(const Varyings& var : ast.stageInputVaryings)
 				{
-					ast.declareVariable(var.type, var.varName, VarTrait_StageInVarying);
+					ast.declareVariable(var.typeNode->DeduceType(&ast), var.varName, VarTrait_StageInVarying);
 				}
 
 				// Output varyings.
 				// [TODO] Concider to declare these values as locals in main.
-				for(const auto& var : ast.stageOutputVaryings)
+				for(const Varyings& var : ast.stageOutputVaryings)
 				{
-					ast.declareVariable(var.type, var.varName, VarTrait_StageOutVarying);
+					ast.declareVariable(var.typeNode->DeduceType(&ast), var.varName, VarTrait_StageOutVarying);
 				}
 
 				// Declare the global unifroms.
-				for(const auto& unif : ast.uniforms)
+				for(const Uniforms& unif : ast.uniforms)
 				{
-					ast.declareVariable(unif.type, unif.varName);
+					ast.declareVariable(unif.typeNode->DeduceType(&ast), unif.varName);
 				}
 			}
 
@@ -1430,30 +1431,30 @@ namespace XSR
 				// Keep in mind that in GLSL there are no sematics. So for vertex attributes
 				// we are going to output the semantic rater than the variable name.
 				for(const auto& var : ast.vertexAttribs) {
-					result += "attribute " + var.type.ComposeVarDecl(ast.lang, var.semantic) + ";";
+					result += "attribute " + var.typeNode->DeduceType(&ast).ComposeVarDecl(ast.lang, var.semantic) + ";";
 				}
 
 				for(const auto& var : ast.stageInputVaryings) {
 					// [TODO] for older versions of GLSL this should be "vaying" instead of "in".
-					result += "in " + var.type.ComposeVarDecl(ast.lang, var.varName) + ";";
+					result += "in " + var.typeNode->DeduceType(&ast).ComposeVarDecl(ast.lang, var.varName) + ";";
 				}
 
 				for(const auto& var : ast.stageOutputVaryings) {
 					// [TODO] for older versions of GLSL this should be "vaying" instead of out
-					result += "out " + var.type.ComposeVarDecl(ast.lang, var.varName) + ";";
+					result += "out " + var.typeNode->DeduceType(&ast).ComposeVarDecl(ast.lang, var.varName) + ";";
 				}
 			}
 
 			// GENERATE the declaration code for uniforms for both GLSL and HLSL.
 			for(const auto& unif : ast.uniforms)
 			{
-				result += "uniform " + unif.type.ComposeVarDecl(ast.lang, unif.varName) + ";";
+				const TypeDesc type = unif.typeNode->DeduceType(&ast);
+				result += "uniform " + type.ComposeVarDecl(ast.lang, unif.varName) + ";";
 
 				// Textures in HLSL need a sampler. Define 1 sampler for every texture.
 				if(ast.lang.outputLanguage == OL_HLSL) {
-					//[TODO] Arrays...
-					if(unif.type.GetBuiltInType() == Type_Texture2D ||
-						 unif.type.GetBuiltInType() == Type_TextureCube) {
+					// TODO: Arrays of textures.
+					if(type.GetBuiltInType() == Type_Texture2D || type.GetBuiltInType() == Type_TextureCube) {
 						result += "uniform sampler " + unif.varName  + "_sgeSS;";
 					}
 				}

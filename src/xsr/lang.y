@@ -78,8 +78,7 @@ Location toLocation(const YYLTYPE& yyl) {
 %type <node>		vardecl_var_list vardecl assign_stmt
 %type <node>		stmt_list function_decl 
 %type <node>		program grammar_elem grammar_list
-%type <typeDesc> 	shader_gvar_type
-%type <node>		shader_globals // These actually have no type.
+%type <node>		shader_global_variables // These actually have no type.
 %type <node>        type_node
 
 // The root.
@@ -90,8 +89,8 @@ Location toLocation(const YYLTYPE& yyl) {
 program : grammar_list { ast->program = $1; $$ = $1; }
 
 grammar_elem :
-		function_decl 	{ $$ = $1; }
-	|	shader_globals	{ $$ = nullptr; } // This is not a node, it just modifies the AST. 
+		function_decl 			{ $$ = $1; }
+	|	shader_global_variables	{ $$ = nullptr; } // This is not a node, it just modifies the AST. 
 	;
 
 grammar_list : 
@@ -118,23 +117,18 @@ grammar_list :
 	// A genric type mentioning.
 	//-------------------------------------------------
 	type_node : 
-		 IDENT 				        { $$ = ast->push<TypeDeclNode>(toLocation(@1)); $$->As<TypeDeclNode>().resolvedType = TypeDesc(false, $1);}
-		| type_node '[' NUM_INT ']' { $$ = $1; $$->As<TypeDeclNode>().resolvedType.AddArrayLevel($3); }
+		  IDENT						{ $$ = ast->push<TypeDeclNode>(toLocation(@1)); $$->As<TypeDeclNode>().resolvedType = TypeDesc(false, $1);}
+		| type_node '[' NUM_INT ']'	{ $$ = $1; $$->As<TypeDeclNode>().resolvedType.AddArrayLevel($3); }
 	
 	//-------------------------------------------------
 	// Global variables, uniforms, varyings, attributes
 	//-------------------------------------------------
-	
-shader_gvar_type : 
-		IDENT					{ $$ = TypeDesc(false, $1); }
-	|	IDENT '[' NUM_INT ']'	{ $$ = TypeDesc(false, $1, $3); }
-		
-shader_globals : 
+shader_global_variables : 
 		// These aren't real nodes for now in order to reduce comprexity...
-		ATTRIBUTE shader_gvar_type IDENT ':' IDENT ';'	{ $$ = nullptr; ast->vertexAttribs.push_back({$2, $3, $5}); }
-	|	IN        shader_gvar_type IDENT ';'			{ $$ = nullptr; ast->stageInputVaryings.push_back({$2, $3}); }
-	|	OUT       shader_gvar_type IDENT ';'			{ $$ = nullptr; ast->stageOutputVaryings.push_back({$2, $3}); }
-	|	UNIFORM	  shader_gvar_type IDENT ';'			{ $$ = nullptr; ast->uniforms.push_back({$2, $3}); }
+		ATTRIBUTE type_node IDENT ':' IDENT ';'	{ $$ = nullptr; ast->vertexAttribs.push_back(VertexAttribs((TypeDeclNode*)$2, $3, $5)); }
+	|	IN        type_node IDENT ';'			{ $$ = nullptr; ast->stageInputVaryings.push_back(Varyings((TypeDeclNode*)$2, $3)); }
+	|	OUT       type_node IDENT ';'			{ $$ = nullptr; ast->stageOutputVaryings.push_back(Varyings((TypeDeclNode*)$2, $3)); }
+	|	UNIFORM	  type_node IDENT ';'			{ $$ = nullptr; ast->uniforms.push_back(Uniforms((TypeDeclNode*)$2, $3)); }
 	;
 	
 	//-------------------------------------------------
