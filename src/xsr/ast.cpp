@@ -266,7 +266,7 @@ const Ast::FullVariableDesc* Ast::declareVariable(const TypeDesc& td, const std:
 
 	FullVariableDesc fvd;
 
-	for(auto s : scope) fvd.fullName += s + "::";
+	for(const std::string& s : scope) fvd.fullName += s + "::";
 
 	fvd.fullName += name;
 	fvd.type = td;
