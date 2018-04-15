@@ -763,6 +763,46 @@ TypeDesc FuncCall::Internal_DeduceType(Ast* ast)
 		resolvedType = args[1]->DeduceType(ast);
 	}
 
+	if(fnName == "abs")
+	{
+		if(args.size() != 1)
+		{
+			throw ParseExcept(location, "Invalid call to " + fnName + "(T a)");
+		}
+
+		resolvedType = args[0]->DeduceType(ast);
+	}
+
+	if (fnName == "sin" || fnName == "cos" || fnName == "asin" || fnName == "acos" || fnName == "exp")
+	{
+		if (args.size() != 1)
+		{
+			throw ParseExcept(location, "Invalid call to " + fnName + "(float t)");
+		}
+
+		if (args[0]->DeduceType(ast).IsSame(Type_float, false) == false)
+		{
+			throw ParseExcept(location, "Invalid call to " + fnName + "(float t)");
+		}
+
+		resolvedType = TypeDesc(true, Type_float);
+	}
+
+	if (fnName == "pow" || fnName == "min" || fnName == "max")
+	{
+		if(args.size() != 2)
+		{
+			throw ParseExcept(location, "Invalid call to " + fnName + "(float, float)");
+		}
+
+		if(args[0]->DeduceType(ast).IsSame(Type_float, false) == false || args[1]->DeduceType(ast).IsSame(Type_float, false) == false)
+		{
+			throw ParseExcept(location, "Invalid call to " + fnName + "(float, float)");
+		}
+
+		resolvedType = TypeDesc(true, Type_float);
+	}
+
 	if(fnName == "dot")
 	{
 		if(args.size() != 2){
